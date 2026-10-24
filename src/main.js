@@ -22,7 +22,7 @@ let timer = null
 let saving = null
 let conflict = false
 
-const editor = createEditor($('editor'), { onChange: changed, onLink: openTask })
+const editor = createEditor($('editor'), { onChange: changed, onLink: openTask, onBack: () => { if (doc.path === HOME) return false; go(HOME); return true } })
 
 // ---------- status + banner ----------
 function status(text, tone = '') {
@@ -77,8 +77,27 @@ function template(path) {
   return `---\narea: ${area}\nstatus: open\n---\n# ${titleOf(path)}\n\n## Notes\n\n\n## Claude\n`
 }
 
+// Where the cursor goes when a page opens: back where you left the list, or under Notes on a task page.
+const cursors = {}
+function settle(path, focus) {
+  const text = editor.text()
+  let at = cursors[path]
+  if (at == null && path !== HOME) {
+    const notes = text.indexOf('## Notes\n')
+    at = notes < 0 ? text.length : notes + '## Notes\n'.length
+  }
+  editor.place(Math.min(at ?? 0, text.length), focus)
+}
+
 async function open(path) {
+  // Keep keyboard focus across pages on a computer; on a phone, don't pop the keyboard.
+  const focus = editor.view.hasFocus && matchMedia('(pointer: fine)').matches
+  if (doc.path) cursors[doc.path] = editor.view.state.selection.main.head
   await flush()
+  try { await load(path) } finally { if (doc.path === path) settle(path, focus) }
+}
+
+async function load(path) {
   clearTimeout(timer)
   conflict = false
   banner('')
@@ -253,7 +272,7 @@ $('settings-form').addEventListener('submit', async (e) => {
 $('cancel').onclick = () => { $('settings').hidden = true; $('app').hidden = false }
 $('menu').onclick = showSettings
 $('back').onclick = () => go(HOME)
-$('title').onclick = () => editor.view.scrollDOM.scrollTo({ top: 0, behavior: 'smooth' })
+$('title').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 // ---------- start ----------
 const cfg = store.get('config')
