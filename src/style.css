@@ -1,18 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');
 
-/* One mono face at one size on a grid of character cells; hierarchy comes from gray fills,
-   case and tone. The highlighter green is kept for text selection only. */
+/* One mono face at one size on a grid of character cells. The grays are sampled from the
+   reference: paper, a light band for the current line, mid chips, a strong gray for emphasis.
+   The only color is a pastel rainbow when you select text. */
 :root {
-  --paper: #e8e8e8;
-  --grid: rgb(0 0 0 / .05);
-  --band: #d6d6d6;
-  --chip: #cbcbcb;
-  --ink: #1d1d1d;
-  --muted: #6b6b6b;
-  --faint: #a2a2a2;
-  --rule: #c2c2c2;
-  --caret: #1d1d1d;
-  --select: rgb(214 247 94 / .6);
+  --paper: #f1f1f1;
+  --grid: rgb(0 0 0 / .055);
+  --band: #e0e0e0;
+  --chip: #c9c9c9;
+  --strong: #a8a8a8;
+  --ink: #242424;
+  --muted: #5e5e5e;
+  --faint: #9c9c9c;
+  --rule: #c9c9c9;
+  --caret: #242424;
+  --select: linear-gradient(90deg, #ffd3df, #ffe2c2, #fff2b3, #d6f3c8, #c9e6fb, #ddd3fb);
+  --select-solid: #ddd3fb;
   --mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   --row: 24px;
   --measure: 76ch;
@@ -21,33 +24,38 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #161616;
-    --grid: rgb(255 255 255 / .04);
-    --band: #262626;
-    --chip: #303030;
-    --ink: #e2e2e2;
-    --muted: #8f8f8f;
-    --faint: #565656;
-    --rule: #333333;
-    --caret: #d6f75e;
-    --select: rgb(214 247 94 / .3);
+    --paper: #1b1b1b;
+    --grid: rgb(255 255 255 / .045);
+    --band: #2c2c2c;
+    --chip: #3b3b3b;
+    --strong: #575757;
+    --ink: #e4e4e4;
+    --muted: #a0a0a0;
+    --faint: #616161;
+    --rule: #3b3b3b;
+    --caret: #e4e4e4;
+    --select: linear-gradient(90deg, rgb(255 179 199 / .38), rgb(255 207 156 / .38), rgb(255 236 150 / .38), rgb(178 234 152 / .38), rgb(160 210 245 / .38), rgb(196 180 245 / .38));
+    --select-solid: rgb(196 180 245 / .45);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #161616;
-  --grid: rgb(255 255 255 / .04);
-  --band: #262626;
-  --chip: #303030;
-  --ink: #e2e2e2;
-  --muted: #8f8f8f;
-  --faint: #565656;
-  --rule: #333333;
-  --caret: #d6f75e;
-  --select: rgb(214 247 94 / .3);
+  --paper: #1b1b1b;
+  --grid: rgb(255 255 255 / .045);
+  --band: #2c2c2c;
+  --chip: #3b3b3b;
+  --strong: #575757;
+  --ink: #e4e4e4;
+  --muted: #a0a0a0;
+  --faint: #616161;
+  --rule: #3b3b3b;
+  --caret: #e4e4e4;
+  --select: linear-gradient(90deg, rgb(255 179 199 / .38), rgb(255 207 156 / .38), rgb(255 236 150 / .38), rgb(178 234 152 / .38), rgb(160 210 245 / .38), rgb(196 180 245 / .38));
+  --select-solid: rgb(196 180 245 / .45);
   color-scheme: dark;
 }
 
+::selection { background: var(--select-solid); }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
 body {
@@ -105,13 +113,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* margin arrow */
 .cm-open { display: block; color: var(--faint); }
-.cm-open-open { color: var(--ink); background: var(--chip); cursor: pointer; }
-.cm-open-open:hover { background: var(--rule); }
+.cm-open-open { color: var(--ink); background: var(--strong); cursor: pointer; }
+.cm-open-open:hover { background: var(--chip); }
 
 /* headings: same size as everything else */
 .cm-h { font-weight: 500; }
 .cm-h1 .cm-h-text, .cm-h2 .cm-h-text { background: var(--chip); padding: 0 1ch; text-transform: uppercase; letter-spacing: .04em; }
-.cm-h1 .cm-h-text { background: var(--ink); color: var(--paper); }
+.cm-h1 .cm-h-text { background: var(--strong); }
 .cm-h3 {
   color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-size: 13px;
   background: linear-gradient(var(--rule), var(--rule)) 0 55% / 100% 1px no-repeat;

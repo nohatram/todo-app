@@ -164,7 +164,8 @@ const layout = EditorView.theme({
   '.cm-cursor, .cm-dropCursor': { borderLeft: '2px solid var(--caret)' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': { background: 'var(--select)' },
   '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'transparent' },
-  '&.cm-focused .cm-activeLine, &.cm-focused .cm-activeLineGutter': { backgroundColor: 'var(--band)' },
+  // the band steps aside while text is selected, so the selection stays visible on that line
+  '&.cm-focused:not(.cm-has-selection) .cm-activeLine, &.cm-focused .cm-activeLineGutter': { backgroundColor: 'var(--band)' },
 })
 
 export function createEditor(parent, { onChange, onLink, onBack }) {
@@ -190,6 +191,7 @@ export function createEditor(parent, { onChange, onLink, onBack }) {
       layout,
       margin(openLine),
       highlightActiveLine(),
+      EditorView.editorAttributes.compute(['selection'], (st) => (st.selection.main.empty ? {} : { class: 'cm-has-selection' })),
       highlightActiveLineGutter(),
       markdown({ base: markdownLanguage }),
       syntaxHighlighting(highlight),
