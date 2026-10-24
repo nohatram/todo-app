@@ -1,6 +1,10 @@
 import './style.css'
 import { createClient, Conflict, AuthError } from './github.js'
 import { createEditor } from './editor.js'
+import { createLocalClient } from 'virtual:local'
+
+// The artifact build keeps files in this browser instead of GitHub (see local.js).
+const LOCAL = import.meta.env.MODE === 'artifact'
 
 const HOME = 'todo.md'
 const SAVE_DELAY = 1200
@@ -54,10 +58,16 @@ const titleOf = (path) => {
 function openTask(slug, area) {
   const path = `tasks/${slugify(slug)}.md`
   store.set(`area:${path}`, area)
-  location.hash = `/${path}`
+  go(path)
 }
 
-window.addEventListener('hashchange', () => open(pathFromHash()))
+// The artifact frame doesn't allow path-style hashes, so it navigates in memory.
+function go(path) {
+  if (LOCAL) open(path)
+  else location.hash = path === HOME ? '' : `/${path}`
+}
+
+if (!LOCAL) window.addEventListener('hashchange', () => open(pathFromHash()))
 
 // ---------- load + save ----------
 const draftKey = (p) => `draft:${p}`
@@ -242,12 +252,17 @@ $('settings-form').addEventListener('submit', async (e) => {
 })
 $('cancel').onclick = () => { $('settings').hidden = true; $('app').hidden = false }
 $('menu').onclick = showSettings
-$('back').onclick = () => { location.hash = '' }
+$('back').onclick = () => go(HOME)
 $('title').onclick = () => editor.view.scrollDOM.scrollTo({ top: 0, behavior: 'smooth' })
 
 // ---------- start ----------
 const cfg = store.get('config')
-if (cfg?.token) {
+if (LOCAL) {
+  document.documentElement.classList.add('is-artifact')
+  $('menu').hidden = true
+  gh = createLocalClient()
+  open(HOME)
+} else if (cfg?.token) {
   gh = createClient(cfg)
   open(pathFromHash())
 } else {

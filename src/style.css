@@ -19,7 +19,7 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #131313;
     --ink: #e6e6e6;
     --muted: #8a8a8a;
@@ -34,6 +34,19 @@
   }
 }
 
+:root[data-theme="dark"] {
+  --paper: #131313;
+  --ink: #e6e6e6;
+  --muted: #8a8a8a;
+  --faint: #4d4d4d;
+  --rule: #262626;
+  --hl: #d6f75e;
+  --hl-ink: #131313;
+  --caret: #d6f75e;
+  --select: rgb(214 247 94 / .28);
+  --warn: #d6f75e;
+  color-scheme: dark;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
@@ -129,6 +142,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .settings .row { display: flex; gap: 20px; align-items: center; }
 .settings .primary { background: var(--ink); color: var(--paper); padding: 10px 20px; font-weight: 700; }
 .settings #cancel { color: var(--muted); }
+
+/* Inside the artifact frame the host already pads for the notch. */
+.is-artifact .bar { top: env(safe-area-inset-top, 0px); padding-top: 8px; }
+.is-artifact body::before { content: ''; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
