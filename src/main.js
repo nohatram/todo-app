@@ -74,7 +74,7 @@ async function open(path) {
   banner('')
   $('back').hidden = path === HOME
   document.body.classList.toggle('is-task', path !== HOME)
-  $('title').textContent = titleOf(path)
+  $('title').textContent = path.replace(/\.md$/, '')
   document.title = titleOf(path)
 
   // Show the local copy instantly, then reconcile with GitHub.

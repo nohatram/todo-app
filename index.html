@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>List</title>
-    <meta name="theme-color" content="#f2f4f6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0f1724" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ededed" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#131313" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -13,20 +13,17 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon-180.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="app">
       <header class="bar">
         <button id="back" class="bar-btn" hidden aria-label="Back to the list">
-          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" /></svg>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4.5 6.5 10l5.5 5.5" /></svg>
         </button>
         <button id="title" class="title">List</button>
         <span id="status" role="status" aria-live="polite"></span>
         <button id="menu" class="bar-btn" aria-label="Settings">
-          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.3" /><circle cx="10" cy="10" r="1.3" /><circle cx="15.5" cy="10" r="1.3" /></svg>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="9" width="2.2" height="2.2" /><rect x="8.9" y="9" width="2.2" height="2.2" /><rect x="14.3" y="9" width="2.2" height="2.2" /></svg>
         </button>
         <div id="banner" class="banner" role="alert" hidden></div>
       </header>
