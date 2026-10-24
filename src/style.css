@@ -1,58 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');
 
-/* One mono face at one size on a grid of character cells. The grays are sampled from the
-   reference: paper, a light band for the current line, mid chips, a strong gray for emphasis.
-   The only color is a pastel rainbow when you select text. */
+/* One mono face at one size on a grid of character cells, light only, all neutral grays:
+   paper, a pale band for the current line, light chips, a mid gray for emphasis. */
 :root {
-  --paper: #f1f1f1;
-  --grid: rgb(0 0 0 / .055);
-  --band: #e0e0e0;
-  --chip: #c9c9c9;
-  --strong: #a8a8a8;
-  --ink: #242424;
-  --muted: #5e5e5e;
-  --faint: #9c9c9c;
-  --rule: #c9c9c9;
-  --caret: #242424;
-  --select: linear-gradient(90deg, #ffd3df, #ffe2c2, #fff2b3, #d6f3c8, #c9e6fb, #ddd3fb);
-  --select-solid: #ddd3fb;
+  --paper: #f7f7f7;
+  --grid: rgb(0 0 0 / .045);
+  --band: #ececec;
+  --chip: #e1e1e1;
+  --strong: #cfcfcf;
+  --ink: #222222;
+  --muted: #666666;
+  --faint: #a8a8a8;
+  --rule: #dddddd;
+  --caret: #222222;
+  --select: #d2d2d2;
+  --select-solid: #d2d2d2;
   --mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   --row: 24px;
   --measure: 76ch;
   --colpad: max(2ch, env(safe-area-inset-left, 0px), calc((100vw - var(--measure)) / 2));
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #1b1b1b;
-    --grid: rgb(255 255 255 / .045);
-    --band: #2c2c2c;
-    --chip: #3b3b3b;
-    --strong: #575757;
-    --ink: #e4e4e4;
-    --muted: #a0a0a0;
-    --faint: #616161;
-    --rule: #3b3b3b;
-    --caret: #e4e4e4;
-    --select: linear-gradient(90deg, rgb(255 179 199 / .38), rgb(255 207 156 / .38), rgb(255 236 150 / .38), rgb(178 234 152 / .38), rgb(160 210 245 / .38), rgb(196 180 245 / .38));
-    --select-solid: rgb(196 180 245 / .45);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --paper: #1b1b1b;
-  --grid: rgb(255 255 255 / .045);
-  --band: #2c2c2c;
-  --chip: #3b3b3b;
-  --strong: #575757;
-  --ink: #e4e4e4;
-  --muted: #a0a0a0;
-  --faint: #616161;
-  --rule: #3b3b3b;
-  --caret: #e4e4e4;
-  --select: linear-gradient(90deg, rgb(255 179 199 / .38), rgb(255 207 156 / .38), rgb(255 236 150 / .38), rgb(178 234 152 / .38), rgb(160 210 245 / .38), rgb(196 180 245 / .38));
-  --select-solid: rgb(196 180 245 / .45);
-  color-scheme: dark;
 }
 
 ::selection { background: var(--select-solid); }
