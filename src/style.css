@@ -1,0 +1,132 @@
+:root {
+  --paper: #f2f4f6;
+  --ink: #18202c;
+  --muted: #6a7383;
+  --rule: #dce1e7;
+  --pen: #2340e6;
+  --pen-wash: #e6eaff;
+  --warn: #b4441c;
+  --font: 'Atkinson Hyperlegible Next', system-ui, -apple-system, sans-serif;
+  --measure: 38rem;
+  --gutter: max(20px, env(safe-area-inset-left));
+  --inset: max(calc(var(--gutter) - 4px), calc((100vw - var(--measure)) / 2 - 4px));
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0f1724;
+    --ink: #d9e0ea;
+    --muted: #7d8899;
+    --rule: #223047;
+    --pen: #93a4ff;
+    --pen-wash: #1c2a4a;
+    --warn: #f0936b;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 18px/1.55 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; border-radius: 6px; }
+
+#app { min-height: 100%; display: flex; flex-direction: column; }
+
+/* ---------- top bar ---------- */
+.bar {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  /* lines the title up with the text column; the 4px is the title button's own padding */
+  padding: calc(env(safe-area-inset-top) + 8px) var(--inset) 8px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.bar-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: var(--muted); }
+.bar-btn:hover { color: var(--ink); }
+.bar-btn svg { width: 20px; height: 20px; fill: currentColor; }
+#back svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.title { font-weight: 600; font-size: 15px; color: var(--muted); padding: 6px 4px; }
+@media (min-width: 720px) { #back:not([hidden]) { margin-left: -44px; } }
+#back:not([hidden]) + .title { color: var(--ink); }
+#status { margin-left: auto; font-size: 13px; color: var(--muted); transition: opacity .4s; }
+#status[data-tone='quiet'] { opacity: .6; }
+#status[data-tone='warn'] { color: var(--warn); }
+
+/* ---------- banner ---------- */
+.banner {
+  flex: 1 1 100%; margin: 4px 4px 0; padding: 12px 14px; border-radius: 12px;
+  background: var(--pen-wash); font-size: 15px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+}
+.banner[hidden] { display: none; }
+.banner p { margin: 0; flex: 1 1 100%; }
+.banner button { font-weight: 600; color: var(--pen); }
+
+[hidden] { display: none !important; }
+
+/* ---------- editor (layout lives in editor.js) ---------- */
+#editor { flex: 1; }
+
+/* headings */
+.cm-h { font-weight: 700; }
+.cm-h1 { font-size: 32px; line-height: 1.2; letter-spacing: -.02em; padding-top: 12px; }
+.cm-h2 { font-size: 30px; line-height: 1.2; letter-spacing: -.02em; padding-top: 28px; padding-bottom: 2px; }
+.cm-h3 { font-size: 15px; font-weight: 600; color: var(--muted); padding-top: 14px; }
+.cm-line.cm-h2:first-child { padding-top: 4px; }
+/* On task pages the title is the h1, so its sections step down. */
+.is-task .cm-h2 { font-size: 20px; padding-top: 20px; }
+.cm-today-date { font-size: 15px; font-weight: 400; letter-spacing: 0; color: var(--pen); margin-left: 12px; vertical-align: 3px; }
+
+/* tasks */
+.cm-task { padding-left: 32px !important; text-indent: -32px; }
+.cm-check {
+  display: inline-grid; place-items: center; vertical-align: -3px;
+  width: 22px; height: 22px; margin-right: 10px; text-indent: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.cm-check svg { width: 20px; height: 20px; overflow: visible; }
+.cm-check rect { fill: none; stroke: var(--muted); stroke-width: 1.5; transition: stroke .2s, fill .2s; }
+.cm-check path { fill: none; stroke: var(--paper); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16; stroke-dashoffset: 16; }
+.cm-check:hover rect { stroke: var(--pen); }
+.cm-check.is-done rect { stroke: var(--pen); fill: var(--pen); }
+.cm-check.is-done path { stroke-dashoffset: 0; }
+.cm-check.is-done.just-toggled path, .cm-done .cm-check path { transition: stroke-dashoffset .28s cubic-bezier(.3, .7, .2, 1) .05s; }
+.cm-done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--pen); text-decoration-thickness: 1.5px; }
+
+.cm-bullet { padding-left: 26px !important; text-indent: -26px; color: var(--muted); }
+
+/* links + tags */
+.cm-wikilink { color: var(--pen); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; }
+.cm-claude { color: var(--pen); background: var(--pen-wash); border-radius: 5px; padding: 0 3px; font-size: .9em; }
+.cm-fm { font-size: 14px; color: var(--muted); }
+
+/* ---------- settings ---------- */
+.settings { min-height: 100%; display: grid; place-items: start center; padding: calc(env(safe-area-inset-top) + 48px) var(--gutter) 48px; }
+.settings form { width: 100%; max-width: 26rem; display: grid; gap: 16px; }
+.settings h1 { margin: 0; font-size: 30px; line-height: 1.2; letter-spacing: -.02em; }
+.settings p { margin: 0; color: var(--muted); font-size: 16px; }
+.settings .hint { font-size: 14px; }
+.settings label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+.settings input {
+  font: 400 17px var(--font); color: var(--ink); background: transparent;
+  border: 1.5px solid var(--rule); border-radius: 10px; padding: 10px 12px;
+}
+.settings input:focus { outline: none; border-color: var(--pen); }
+.settings .error { color: var(--warn); min-height: 0; }
+.settings .error:empty { display: none; }
+.settings .row { display: flex; gap: 20px; align-items: center; }
+.settings .primary { background: var(--pen); color: var(--paper); font-weight: 600; padding: 10px 20px; border-radius: 10px; }
+.settings #cancel { color: var(--muted); }
+.settings[hidden], #app[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
