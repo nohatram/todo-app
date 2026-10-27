@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');
 
-/* One mono face at one size on a grid of character cells, light only, all neutral grays:
-   paper, a pale band for the current line, light chips, a mid gray for emphasis. */
+/* One mono face at one size on a grid of character cells, all neutral grays:
+   paper, a pale band for the current line, light chips, a mid gray for emphasis.
+   Light by default; the corner switch sets data-theme="dark" and each device remembers it. */
 :root {
   --paper: #f7f7f7;
   --grid: rgb(0 0 0 / .045);
@@ -20,6 +21,22 @@
   --measure: 76ch;
   --colpad: max(2ch, env(safe-area-inset-left, 0px), calc((100vw - var(--measure)) / 2));
   color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #161616;
+  --grid: rgb(255 255 255 / .045);
+  --band: #222222;
+  --chip: #2c2c2c;
+  --strong: #3d3d3d;
+  --ink: #e4e4e4;
+  --muted: #9a9a9a;
+  --faint: #5e5e5e;
+  --rule: #2c2c2c;
+  --caret: #e4e4e4;
+  --select: #3a3a3a;
+  --select-solid: #3a3a3a;
+  color-scheme: dark;
 }
 
 ::selection { background: var(--select-solid); }

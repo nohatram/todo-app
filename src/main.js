@@ -271,6 +271,22 @@ $('settings-form').addEventListener('submit', async (e) => {
 })
 $('cancel').onclick = () => { $('settings').hidden = true; $('app').hidden = false }
 $('menu').onclick = showSettings
+
+// ---------- light / dark ----------
+function applyTheme(theme) {
+  const dark = theme === 'dark'
+  if (dark) document.documentElement.dataset.theme = 'dark'
+  else delete document.documentElement.dataset.theme
+  $('theme').textContent = dark ? 'Light' : 'Dark'
+  $('theme').setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode')
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#161616' : '#f7f7f7')
+}
+applyTheme((() => { try { return localStorage.getItem('theme') } catch { return null } })())
+$('theme').onclick = () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+  try { localStorage.setItem('theme', next) } catch {}
+  applyTheme(next)
+}
 $('back').onclick = () => go(HOME)
 $('title').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 

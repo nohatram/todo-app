@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="theme-color" content="#f7f7f7" />
+    <script>try { if (localStorage.getItem('theme') === 'dark') { document.documentElement.dataset.theme = 'dark'; document.querySelector('meta[name=theme-color]').content = '#161616' } } catch (e) {}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>List</title>
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,6 +20,7 @@
         <button id="back" class="chip" hidden aria-label="Back to the list"><kbd>esc</kbd>back</button>
         <button id="title" class="title">List</button>
         <span id="status" role="status" aria-live="polite"></span>
+        <button id="theme" class="chip" aria-label="Switch to dark mode">Dark</button>
         <button id="menu" class="chip">Settings</button>
         <div id="banner" class="banner" role="alert" hidden></div>
       </header>
