@@ -87,26 +87,6 @@ const images = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 })
 
-// A long bare URL, shown short while you're not on its line.
-class UrlWidget extends WidgetType {
-  constructor(href) { super(); this.href = href }
-  eq(o) { return o.href === this.href }
-  toDOM() {
-    const a = document.createElement('span')
-    a.className = 'cm-url'
-    a.dataset.href = this.href
-    a.title = coarse ? this.href : `${this.href}  (⌘-click to open)`
-    try {
-      const u = new URL(this.href)
-      const first = u.pathname.split('/').filter(Boolean)[0]
-      const more = u.pathname.split('/').filter(Boolean).length > 1 || u.search
-      a.textContent = u.host.replace(/^www\./, '') + (first ? `/${first}` : '') + (more ? '/…' : '')
-    } catch { a.textContent = this.href }
-    return a
-  }
-  ignoreEvent() { return false }
-}
-
 // ---------- live preview ----------
 function build(view) {
   const decos = []
@@ -158,9 +138,7 @@ function build(view) {
         for (const u of text.matchAll(BARE)) {
           if (taken.some(([x, y]) => u.index >= x && u.index < y) || text.slice(Math.max(0, u.index - 2), u.index) === '](') continue
           const a = line.from + u.index, b = a + u[0].length
-          decos.push(editing
-            ? Decoration.mark({ class: 'cm-url', attributes: { 'data-href': u[0] } }).range(a, b)
-            : Decoration.replace({ widget: new UrlWidget(u[0]) }).range(a, b))
+          decos.push(Decoration.mark({ class: 'cm-url', attributes: { 'data-href': u[0] } }).range(a, b))
         }
         for (const im of text.matchAll(IMAGE)) {
           // The picture shows below the line; its markdown only shows while you're on that line.
