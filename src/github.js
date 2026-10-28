@@ -11,6 +11,11 @@ const enc = (text) => {
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   return btoa(bin)
 }
+const encBytes = (bytes) => {
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(bin)
+}
 const dec = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
 
 export function createClient({ repo, token, branch = 'main', api = API }) {
@@ -41,6 +46,18 @@ export function createClient({ repo, token, branch = 'main', api = API }) {
       const res = await fetch(url(path), { method: 'PUT', headers, body: JSON.stringify(body) })
       const json = await check(res)
       return json.content.sha
+    },
+    // Images: new files only (names are unique), so no sha to track.
+    async putFile(path, blob, message) {
+      const content = encBytes(new Uint8Array(await blob.arrayBuffer()))
+      const res = await fetch(url(path), { method: 'PUT', headers, body: JSON.stringify({ message, content, branch }) })
+      await check(res)
+    },
+    async getBlob(path) {
+      const res = await fetch(`${url(path)}?ref=${encodeURIComponent(branch)}`, { headers: { ...headers, Accept: 'application/vnd.github.raw+json' } })
+      if (res.status === 404) return null
+      if (!res.ok) await check(res)
+      return res.blob()
     },
   }
 }

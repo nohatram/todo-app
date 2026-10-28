@@ -1,6 +1,6 @@
 // CodeMirror setup: plain-text lines (list markers hidden), heading labels, a left margin with an
 // "open page" arrow on the current line, and keyboard navigation.
-import { EditorState, Annotation } from '@codemirror/state'
+import { EditorState, Annotation, StateField } from '@codemirror/state'
 import {
   EditorView, Decoration, ViewPlugin, WidgetType, keymap, drawSelection,
   gutter, GutterMarker, highlightActiveLine, highlightActiveLineGutter,
@@ -14,6 +14,7 @@ const LIST = /^(\s*)([-*+]) /
 const HEADING = /^(#{1,6}) /
 const LINK = /\s*\[\[([^\]\n]+)\]\]/g
 const MENTION = /@claude\b/g
+const IMAGE = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g
 
 const remote = Annotation.define()
 const hide = Decoration.replace({})
@@ -43,6 +44,44 @@ class DateWidget extends WidgetType {
     return s
   }
 }
+
+// ---------- images ----------
+// Each image line gets the picture drawn below it. Block widgets have to come from a state field.
+let resolveImage = async (src) => src
+class ImageWidget extends WidgetType {
+  constructor(src, alt) { super(); this.src = src; this.alt = alt }
+  eq(o) { return o.src === this.src }
+  get estimatedHeight() { return 240 }
+  toDOM(view) {
+    const box = document.createElement('div')
+    box.className = 'cm-img'
+    const img = document.createElement('img')
+    img.alt = this.alt || ''
+    img.onload = () => view.requestMeasure()
+    resolveImage(this.src).then((u) => { img.src = u }).catch(() => {
+      box.classList.add('is-missing')
+      box.textContent = `image not found: ${this.src}`
+    })
+    box.append(img)
+    return box
+  }
+  ignoreEvent() { return false }
+}
+function imageBlocks(state) {
+  const decos = []
+  const doc = state.doc
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n)
+    if (!line.text.includes('![')) continue
+    for (const m of line.text.matchAll(IMAGE)) decos.push(Decoration.widget({ widget: new ImageWidget(m[2], m[1]), block: true, side: 1 }).range(line.to))
+  }
+  return Decoration.set(decos, true)
+}
+const images = StateField.define({
+  create: imageBlocks,
+  update: (value, tr) => (tr.docChanged ? imageBlocks(tr.state) : value),
+  provide: (f) => EditorView.decorations.from(f),
+})
 
 // ---------- live preview ----------
 function build(view) {
@@ -83,6 +122,11 @@ function build(view) {
           const b = a + l[0].length
           // Page links stay out of the way; the margin shows which lines have a page.
           decos.push(editing ? Decoration.mark({ class: 'cm-link-raw' }).range(a, b) : hide.range(a, b))
+        }
+        for (const im of text.matchAll(IMAGE)) {
+          // The picture shows below the line; its markdown only shows while you're on that line.
+          const a = line.from + im.index
+          decos.push(editing ? Decoration.mark({ class: 'cm-imgsrc' }).range(a, a + im[0].length) : hide.range(a, a + im[0].length))
         }
         for (const c of text.matchAll(MENTION)) {
           decos.push(Decoration.mark({ class: 'cm-claude' }).range(line.from + c.index, line.from + c.index + c[0].length))
@@ -168,7 +212,8 @@ const layout = EditorView.theme({
   '&.cm-focused:not(.cm-has-selection) .cm-activeLine, &.cm-focused .cm-activeLineGutter': { backgroundColor: 'var(--band)' },
 })
 
-export function createEditor(parent, { onChange, onLink, onBack }) {
+export function createEditor(parent, { onChange, onLink, onBack, onImage, loadImage }) {
+  if (loadImage) resolveImage = loadImage
   const view = new EditorView({ parent, state: EditorState.create({ doc: '', extensions: extensions() }) })
 
   // Open a line's page, giving it one first if it doesn't have a link yet.
@@ -183,6 +228,23 @@ export function createEditor(parent, { onChange, onLink, onBack }) {
     return true
   }
 
+  // Put each image on its own line at the cursor (or where it was dropped), then save it in the background.
+  async function insertImages(files, at) {
+    for (const file of files) {
+      const src = await onImage(file)
+      if (!src) continue
+      const st = view.state
+      const pos = at ?? st.selection.main.head
+      const line = st.doc.lineAt(pos)
+      const md = `![](${src})`
+      const insert = line.text.trim() === '' ? md : `\n${md}`
+      const from = line.text.trim() === '' ? line.from : line.to
+      view.dispatch({ changes: { from, to: line.text.trim() === '' ? line.to : from, insert }, selection: { anchor: from + insert.length }, scrollIntoView: true })
+      at = undefined
+    }
+  }
+  const imageFiles = (list) => [...(list || [])].filter((f) => f.type.startsWith('image/'))
+
   function extensions() {
     return [
       history(),
@@ -196,6 +258,23 @@ export function createEditor(parent, { onChange, onLink, onBack }) {
       markdown({ base: markdownLanguage }),
       syntaxHighlighting(highlight),
       preview,
+      images,
+      EditorView.domEventHandlers({
+        paste(e) {
+          const files = imageFiles(e.clipboardData?.files)
+          if (!files.length || !onImage) return false
+          e.preventDefault()
+          insertImages(files)
+          return true
+        },
+        drop(e, v) {
+          const files = imageFiles(e.dataTransfer?.files)
+          if (!files.length || !onImage) return false
+          e.preventDefault()
+          insertImages(files, v.posAtCoords({ x: e.clientX, y: e.clientY }) ?? undefined)
+          return true
+        },
+      }),
       keymap.of([
         { key: 'Mod-Enter', run: (v) => openLine(v, v.state.doc.lineAt(v.state.selection.main.head)) },
         { key: 'Escape', run: () => onBack() },
@@ -224,6 +303,7 @@ export function createEditor(parent, { onChange, onLink, onBack }) {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: head }, annotations: remote.of(true) })
     },
     text: () => view.state.doc.toString(),
+    insertImages: (files) => insertImages(imageFiles(files)),
     place(pos, focus) {
       view.dispatch({ selection: { anchor: pos }, scrollIntoView: focus })
       if (focus) view.focus()

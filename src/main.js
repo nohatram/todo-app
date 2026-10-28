@@ -22,7 +22,75 @@ let timer = null
 let saving = null
 let conflict = false
 
-const editor = createEditor($('editor'), { onChange: changed, onLink: openTask, onBack: () => { if (doc.path === HOME) return false; go(HOME); return true } })
+const editor = createEditor($('editor'), {
+  onChange: changed,
+  onLink: openTask,
+  onBack: () => { if (doc.path === HOME) return false; go(HOME); return true },
+  onImage: saveImage,
+  loadImage,
+})
+
+// ---------- images ----------
+// Images are saved to assets/ in the repo and linked with normal markdown, relative to the page.
+const imageUrls = new Map() // repo path -> object URL
+const MAX_SIDE = 1600
+
+function repoPathOf(src) {
+  if (/^(https?:|data:|blob:)/.test(src)) return null
+  const dir = doc.path.includes('/') ? doc.path.slice(0, doc.path.lastIndexOf('/') + 1) : ''
+  return decodeURIComponent(new URL(src, `https://repo/${dir}`).pathname.slice(1))
+}
+
+async function loadImage(src) {
+  const path = repoPathOf(src)
+  if (!path) return src
+  if (imageUrls.has(path)) return imageUrls.get(path)
+  const blob = await gh.getBlob(path)
+  if (!blob) throw new Error('missing')
+  const u = URL.createObjectURL(blob)
+  imageUrls.set(path, u)
+  return u
+}
+
+// Phone photos are huge; keep the long side to 1600px so the repo stays small and pages load fast.
+async function shrink(file) {
+  try {
+    const bmp = await createImageBitmap(file)
+    const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height))
+    if (scale === 1 && file.size < 700_000) return { blob: file, ext: (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg') }
+    const c = document.createElement('canvas')
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale)
+    const ctx = c.getContext('2d')
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height) // transparent areas become white, not black
+    ctx.drawImage(bmp, 0, 0, c.width, c.height)
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.85))
+    return { blob, ext: 'jpg' }
+  } catch {
+    return { blob: file, ext: (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg') }
+  }
+}
+
+async function saveImage(file) {
+  if (!gh || !doc.path) return null
+  const { blob, ext } = await shrink(file)
+  const d = new Date(), p = (n) => String(n).padStart(2, '0')
+  const name = `assets/${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}.${ext}`
+  imageUrls.set(name, URL.createObjectURL(blob)) // shows right away while it uploads
+  upload(name, blob)
+  return doc.path.includes('/') ? `../${name}` : name
+}
+
+async function upload(name, blob) {
+  status('Saving image')
+  try {
+    await gh.putFile(name, blob, `add image ${name}`)
+    status(store.get(draftKey(doc.path)) ? 'Editing' : 'Saved', 'quiet')
+  } catch (e) {
+    status('Image not saved', 'warn')
+    banner(e instanceof AuthError ? e.message : "Couldn't save the image to GitHub. It's only on this device until it uploads.", [['Try again', () => { banner(''); upload(name, blob) }]])
+  }
+}
+
 
 // ---------- status + banner ----------
 function status(text, tone = '') {
@@ -271,6 +339,8 @@ $('settings-form').addEventListener('submit', async (e) => {
 })
 $('cancel').onclick = () => { $('settings').hidden = true; $('app').hidden = false }
 $('menu').onclick = showSettings
+$('addimg').onclick = () => $('imgpick').click()
+$('imgpick').onchange = (e) => { editor.insertImages(e.target.files); e.target.value = '' }
 
 // ---------- light / dark ----------
 // The button shows where it takes you: a moon in light mode, a sun in dark mode.
