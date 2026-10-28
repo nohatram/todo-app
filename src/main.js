@@ -25,7 +25,7 @@ let conflict = false
 const editor = createEditor($('editor'), {
   onChange: changed,
   onLink: openTask,
-  onBack: () => { if (doc.path === HOME) return false; go(HOME); return true },
+  onBack: () => back(),
   onImage: saveImage,
   loadImage,
 })
@@ -123,10 +123,55 @@ const titleOf = (path) => {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+// ---------- the trail of pages you came through ----------
+// Opening a page from another page remembers where you were, so Esc steps back one level at a time.
+// Kept for the session, so a reload deep in the trail still knows the way back.
+let trail = (() => { try { return JSON.parse(sessionStorage.getItem('trail')) || [] } catch { return [] } })()
+const saveTrail = () => { try { sessionStorage.setItem('trail', JSON.stringify(trail)) } catch {} }
+
 function openTask(slug, area) {
   const path = `tasks/${slugify(slug)}.md`
+  if (path === doc.path) return
+  // a page opened from another page takes its work/personal tag
+  if (!area && doc.path !== HOME) area = /^area:\s*(\w+)/m.exec(editor.text())?.[1] || ''
   store.set(`area:${path}`, area)
+  trail.push(doc.path); saveTrail()
   go(path)
+}
+
+function back() {
+  if (doc.path === HOME) return false
+  const prev = trail.pop() ?? HOME
+  saveTrail()
+  go(prev)
+  return true
+}
+
+// jump straight to a level above: everything below it is forgotten
+function jumpTo(path) {
+  const i = trail.lastIndexOf(path)
+  trail = path === HOME || i < 0 ? [] : trail.slice(0, i)
+  saveTrail()
+  go(path)
+}
+
+const nameOf = (path) => (path === HOME ? 'todo' : path.replace(/^tasks\//, '').replace(/\.md$/, ''))
+function renderPath(path) {
+  const nav = $('path')
+  nav.replaceChildren()
+  let chain = path === HOME ? [HOME] : [...(trail[0] === HOME ? [] : [HOME]), ...trail, path]
+  // long trails keep the first level and the last two
+  const hidden = chain.length > 4
+  if (hidden) chain = [chain[0], null, ...chain.slice(-3)]
+  chain.forEach((p, i) => {
+    if (i) nav.append(Object.assign(document.createElement('span'), { className: 'sep', textContent: '/' }))
+    if (p === null) { nav.append(Object.assign(document.createElement('span'), { className: 'gap', textContent: '…' })); return }
+    const here = i === chain.length - 1
+    const b = Object.assign(document.createElement('button'), { className: here ? 'crumb here' : 'crumb', textContent: nameOf(p) })
+    b.onclick = here ? () => window.scrollTo({ top: 0, behavior: 'smooth' }) : () => jumpTo(p)
+    if (here) b.setAttribute('aria-current', 'page')
+    nav.append(b)
+  })
 }
 
 // The artifact frame doesn't allow path-style hashes, so it navigates in memory.
@@ -135,7 +180,14 @@ function go(path) {
   else location.hash = path === HOME ? '' : `/${path}`
 }
 
-if (!LOCAL) window.addEventListener('hashchange', () => open(pathFromHash()))
+// The browser's own back and forward buttons keep the trail in step.
+if (!LOCAL) window.addEventListener('hashchange', () => {
+  const path = pathFromHash()
+  if (path === HOME) trail = []
+  else if (trail[trail.length - 1] === path) trail.pop()
+  saveTrail()
+  open(path)
+})
 
 // ---------- load + save ----------
 const draftKey = (p) => `draft:${p}`
@@ -171,7 +223,8 @@ async function load(path) {
   banner('')
   $('back').hidden = path === HOME
   document.body.classList.toggle('is-task', path !== HOME)
-  $('title').textContent = path.replace(/\.md$/, '')
+  if (path === HOME) { trail = []; saveTrail() }
+  renderPath(path)
   document.title = titleOf(path)
 
   // Show the local copy instantly, then reconcile with GitHub.
@@ -366,8 +419,7 @@ $('theme').onclick = () => {
   try { localStorage.setItem('theme', next) } catch {}
   applyTheme(next)
 }
-$('back').onclick = () => go(HOME)
-$('title').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+$('back').onclick = () => back()
 
 // ---------- start ----------
 const cfg = store.get('config')

@@ -78,8 +78,14 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .chip.icon { width: 3ch; height: 20px; padding: 0; display: grid; place-items: center; }
 .chip.icon svg { width: 14px; height: 14px; display: block; }
 .chip kbd { font: inherit; color: var(--muted); margin-right: .6ch; }
-.title { color: var(--ink); padding: 0 .5ch; }
-.title::before { content: '~/'; color: var(--faint); }
+/* where you are: ~/todo / page / subpage, each level above this one clickable */
+.path { display: flex; flex-wrap: wrap; align-items: baseline; min-width: 0; padding: 0 .5ch; }
+.path::before { content: '~/'; color: var(--faint); }
+.crumb { color: var(--muted); }
+.crumb:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.crumb.here { color: var(--ink); }
+.crumb.here:hover { text-decoration: none; }
+.sep, .gap { color: var(--faint); padding: 0 .6ch; }
 #status { margin-left: auto; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 #status[data-tone='quiet'] { color: var(--faint); }
 #status[data-tone='warn'] { color: var(--ink); background: var(--chip); padding: 0 1ch; }
