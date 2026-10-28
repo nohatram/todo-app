@@ -75,6 +75,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 .chip { background: var(--chip); padding: 0 1ch; text-transform: uppercase; letter-spacing: .04em; }
 .chip:hover { background: var(--band); }
+.chip.icon { width: 3ch; height: 20px; padding: 0; display: grid; place-items: center; }
+.chip.icon svg { width: 14px; height: 14px; display: block; }
 .chip kbd { font: inherit; color: var(--muted); margin-right: .6ch; }
 .title { color: var(--ink); padding: 0 .5ch; }
 .title::before { content: '~/'; color: var(--faint); }

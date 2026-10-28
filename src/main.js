@@ -273,11 +273,15 @@ $('cancel').onclick = () => { $('settings').hidden = true; $('app').hidden = fal
 $('menu').onclick = showSettings
 
 // ---------- light / dark ----------
+// The button shows where it takes you: a moon in light mode, a sun in dark mode.
+const MOON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 10.4A5.6 5.6 0 0 1 5.6 3.4a5.6 5.6 0 1 0 7 7Z" fill="currentColor"/></svg>'
+const SUN = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="square"><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></g></svg>'
+
 function applyTheme(theme) {
   const dark = theme === 'dark'
   if (dark) document.documentElement.dataset.theme = 'dark'
   else delete document.documentElement.dataset.theme
-  $('theme').textContent = dark ? 'Light' : 'Dark'
+  $('theme').innerHTML = dark ? SUN : MOON
   $('theme').setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode')
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#161616' : '#f7f7f7')
 }
