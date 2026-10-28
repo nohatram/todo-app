@@ -14,6 +14,10 @@ const LIST = /^(\s*)([-*+]) /
 const HEADING = /^(#{1,6}) /
 const LINK = /\s*\[\[([^\]\n]+)\]\]/g
 const MENTION = /@claude\b/g
+// Web links: [text](url) and bare URLs. Trailing punctuation isn't part of a bare URL.
+const MDLINK = /(?<!!)\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g
+const BARE = /\bhttps?:\/\/[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"]/g
+const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 const IMAGE = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g
 
 const remote = Annotation.define()
@@ -83,6 +87,26 @@ const images = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 })
 
+// A long bare URL, shown short while you're not on its line.
+class UrlWidget extends WidgetType {
+  constructor(href) { super(); this.href = href }
+  eq(o) { return o.href === this.href }
+  toDOM() {
+    const a = document.createElement('span')
+    a.className = 'cm-url'
+    a.dataset.href = this.href
+    a.title = coarse ? this.href : `${this.href}  (⌘-click to open)`
+    try {
+      const u = new URL(this.href)
+      const first = u.pathname.split('/').filter(Boolean)[0]
+      const more = u.pathname.split('/').filter(Boolean).length > 1 || u.search
+      a.textContent = u.host.replace(/^www\./, '') + (first ? `/${first}` : '') + (more ? '/…' : '')
+    } catch { a.textContent = this.href }
+    return a
+  }
+  ignoreEvent() { return false }
+}
+
 // ---------- live preview ----------
 function build(view) {
   const decos = []
@@ -122,6 +146,21 @@ function build(view) {
           const b = a + l[0].length
           // Page links stay out of the way; the margin shows which lines have a page.
           decos.push(editing ? Decoration.mark({ class: 'cm-link-raw' }).range(a, b) : hide.range(a, b))
+        }
+        const taken = []
+        for (const l of text.matchAll(MDLINK)) {
+          const a = line.from + l.index, t0 = a + 1, t1 = t0 + l[1].length, b = a + l[0].length
+          taken.push([l.index, l.index + l[0].length])
+          const mark = Decoration.mark({ class: 'cm-url', attributes: { 'data-href': l[2] } })
+          if (editing) decos.push(mark.range(a, b))
+          else decos.push(hide.range(a, t0), mark.range(t0, t1), hide.range(t1, b))
+        }
+        for (const u of text.matchAll(BARE)) {
+          if (taken.some(([x, y]) => u.index >= x && u.index < y) || text.slice(Math.max(0, u.index - 2), u.index) === '](') continue
+          const a = line.from + u.index, b = a + u[0].length
+          decos.push(editing
+            ? Decoration.mark({ class: 'cm-url', attributes: { 'data-href': u[0] } }).range(a, b)
+            : Decoration.replace({ widget: new UrlWidget(u[0]) }).range(a, b))
         }
         for (const im of text.matchAll(IMAGE)) {
           // The picture shows below the line; its markdown only shows while you're on that line.
@@ -260,6 +299,14 @@ export function createEditor(parent, { onChange, onLink, onBack, onImage, loadIm
       preview,
       images,
       EditorView.domEventHandlers({
+        // Cmd/Ctrl-click opens a link in a new tab; on a phone a tap does, since there's no Cmd key.
+        mousedown(e) {
+          const el = e.target.closest?.('[data-href]')
+          if (!el || !(e.metaKey || e.ctrlKey || coarse)) return false
+          e.preventDefault()
+          window.open(el.dataset.href, '_blank', 'noopener')
+          return true
+        },
         paste(e) {
           const files = imageFiles(e.clipboardData?.files)
           if (!files.length || !onImage) return false

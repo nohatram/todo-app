@@ -339,6 +339,11 @@ $('settings-form').addEventListener('submit', async (e) => {
 })
 $('cancel').onclick = () => { $('settings').hidden = true; $('app').hidden = false }
 $('menu').onclick = showSettings
+// While Cmd/Ctrl is held, links look clickable.
+const modDown = (on) => document.documentElement.classList.toggle('mod-down', on)
+window.addEventListener('keydown', (e) => { if (e.key === 'Meta' || e.key === 'Control') modDown(true) })
+window.addEventListener('keyup', (e) => { if (e.key === 'Meta' || e.key === 'Control') modDown(false) })
+window.addEventListener('blur', () => modDown(false))
 $('addimg').onclick = () => $('imgpick').click()
 $('imgpick').onchange = (e) => { editor.insertImages(e.target.files); e.target.value = '' }
 
