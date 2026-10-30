@@ -7,7 +7,7 @@ const DEFAULTS = {
   count: 7, size: 1.3, overlap: 0.22, gravity: 0.75, swing: 0.992, bounce: 0.82,
   // palette sampled from the reference, violet end (at the hand) to yellow end
   p0: '#c684e4', p1: '#9a9ce3', p2: '#60c9e3', p3: '#73d2b9', p4: '#85db94', p5: '#b1e860', p6: '#eee952',
-  scale: 1.1, flow: 0.18, warp: 1.1, react: 1, shift: 0, spread: 0.9, noise: 1.2, sheen: 1, trail: 0.85, smear: 1, grain: 0.03,
+  scale: 1.1, flow: 0.18, warp: 1.1, react: 1, shift: 0, glow: 0.5, spread: 0.9, noise: 1.2, sheen: 1, trail: 0.85, smear: 1, grain: 0.03,
   ground: 0.6,
 }
 const KEY = 'crazy'
@@ -26,7 +26,7 @@ const CONTROLS = [
   'palette',
   ['spread', 'Spread', 0, 2, 0.01], ['shift', 'Shift', -1, 1, 0.01], ['noise', 'Noise', 0, 3, 0.01],
   ['scale', 'Scale', 0.2, 4, 0.01], ['warp', 'Warp', 0, 3, 0.01], ['flow', 'Flow', 0, 1, 0.01],
-  ['react', 'React', 0, 2, 0.01], ['sheen', 'Sheen', 0, 3, 0.01],
+  ['react', 'React', 0, 2, 0.01], ['sheen', 'Sheen', 0, 3, 0.01], ['glow', 'Glow', 0, 1, 0.01],
   ['trail', 'Trail', 0, 0.99, 0.005], ['smear', 'Smear', 0, 3, 0.01], ['grain', 'Grain', 0, 0.2, 0.005],
   'Ground',
   ['ground', 'Grey', 0.4, 0.85, 0.005],
@@ -117,7 +117,7 @@ const FIELD = `
 precision highp float;
 ${SHAPE}
 uniform vec2 uRes, uMouse;
-uniform float uTime, uScale, uFlow, uWarp, uReact, uSpeed, uShift, uSpread, uNoise, uSheen, uKeep, uSmear, uDt;
+uniform float uTime, uScale, uFlow, uWarp, uReact, uSpeed, uShift, uSpread, uNoise, uSheen, uGlow, uR, uKeep, uSmear, uDt;
 uniform vec3 uPal[7];
 uniform vec2 uV[${MAX}];
 uniform sampler2D uPrev;
@@ -148,6 +148,9 @@ void main() {
   float n = fbm(wq * 1.4 + t * .6);
   float near = exp(-length(p - uMouse) / (m * .22));
   float x = along * uSpread + (n - .5) * uNoise + uShift - uReact * near * (.25 + .5 * uSpeed);
+  // the outline lit toward the green-yellow end, with the swirl bending where the light reaches
+  float rim = 1. - clamp(-shape(p + (vec2(n) - .5) * uR) / (.45 * uR), 0., 1.);
+  x += uGlow * rim * rim * rim * .8;
   vec3 fresh = pal(clamp(x, 0., 1.) * 6.);
   fresh += smoothstep(.55, .95, fbm(wq * 2.2 - t)) * (.06 + .1 * uSpeed * uReact) * uSheen;
 
@@ -197,7 +200,7 @@ export function startCrazy() {
     for (const n of names) u[n] = gl.getUniformLocation(p, n)
     return { p, u, a: gl.getAttribLocation(p, 'a') }
   }
-  const field = program(FIELD, ['uCount', 'uB', 'uRes', 'uMouse', 'uTime', 'uScale', 'uFlow', 'uWarp', 'uReact', 'uSpeed', 'uShift', 'uSpread', 'uNoise', 'uSheen', 'uKeep', 'uSmear', 'uDt', 'uPal', 'uV', 'uPrev'])
+  const field = program(FIELD, ['uCount', 'uB', 'uRes', 'uMouse', 'uTime', 'uScale', 'uFlow', 'uWarp', 'uReact', 'uSpeed', 'uShift', 'uSpread', 'uNoise', 'uSheen', 'uGlow', 'uR', 'uKeep', 'uSmear', 'uDt', 'uPal', 'uV', 'uPrev'])
   const page = program(PAGE, ['uCount', 'uB', 'uRes', 'uTime', 'uDpr', 'uGrain', 'uGround', 'uField'])
   const quad = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, quad)
@@ -402,6 +405,8 @@ export function startCrazy() {
     gl.uniform1f(fu.uSpread, S.spread)
     gl.uniform1f(fu.uNoise, S.noise)
     gl.uniform1f(fu.uSheen, S.sheen)
+    gl.uniform1f(fu.uGlow, S.glow)
+    gl.uniform1f(fu.uR, r * dpr)
     gl.uniform1f(fu.uKeep, Math.pow(S.trail, dt * 60))
     gl.uniform1f(fu.uSmear, S.smear)
     gl.uniform1f(fu.uDt, dt)
