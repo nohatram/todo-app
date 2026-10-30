@@ -186,3 +186,24 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ---------- crazy mode's tuning panel ---------- */
+.tune {
+  position: fixed; z-index: 3; right: max(2ch, env(safe-area-inset-right, 0px));
+  top: calc(env(safe-area-inset-top, 0px) + var(--row) * 2 + 8px);
+  width: min(42ch, calc(100vw - 4ch)); box-sizing: border-box; max-height: calc(100% - var(--row) * 2 - env(safe-area-inset-top, 0px) - 24px); overflow-y: auto;
+  display: grid; gap: 8px; padding: 12px 1.5ch 14px;
+  background: var(--paper); box-shadow: 0 0 0 1px var(--rule);
+  font-size: 12px; line-height: 18px;
+}
+.tune h2 { margin: 6px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.tune h2:first-child { margin-top: 0; }
+.tune-row { display: grid; grid-template-columns: 8ch 1fr 6ch; align-items: center; gap: 1ch; }
+.tune-row.wide { grid-template-columns: 8ch 1fr; }
+.tune-row output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tune input[type=range] { width: 100%; margin: 0; accent-color: var(--ink); }
+.tune-swatches { display: flex; gap: 3px; }
+.tune input[type=color] { width: 22px; height: 20px; padding: 0; border: 1px solid var(--rule); background: none; cursor: pointer; }
+.tune-actions { display: flex; flex-wrap: wrap; gap: 1ch; align-items: center; margin-top: 4px; }
+.tune-note { color: var(--muted); }
+.tune textarea { width: 100%; height: 90px; font: 11px/15px var(--mono); background: var(--paper); color: var(--ink); border: 1px solid var(--rule); }

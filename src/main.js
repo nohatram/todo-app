@@ -412,7 +412,7 @@ const THEMES = {
   dark: { next: 'crazy', icon: ORBS, label: 'Switch to crazy mode', color: '#161616' },
   crazy: { next: 'light', icon: SUN, label: 'Switch to light mode', color: '#999999' },
 }
-let stopCrazy = null
+let crazy = null
 function applyTheme(name) {
   const theme = THEMES[name] ? name : 'light'
   const t = THEMES[theme]
@@ -421,8 +421,10 @@ function applyTheme(name) {
   $('theme').innerHTML = t.icon
   $('theme').setAttribute('aria-label', t.label)
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.color)
-  if (theme === 'crazy' && !stopCrazy) stopCrazy = startCrazy()
-  if (theme !== 'crazy' && stopCrazy) { stopCrazy(); stopCrazy = null }
+  if (theme === 'crazy' && !crazy) crazy = startCrazy()
+  if (theme !== 'crazy' && crazy) { crazy.stop(); crazy = null }
+  $('tune').hidden = theme !== 'crazy'
+  $('tune').setAttribute('aria-expanded', 'false')
 }
 applyTheme((() => { try { return localStorage.getItem('theme') } catch { return null } })())
 $('theme').onclick = () => {
@@ -430,6 +432,8 @@ $('theme').onclick = () => {
   try { localStorage.setItem('theme', next) } catch {}
   applyTheme(next)
 }
+// crazy mode's tuning panel
+$('tune').onclick = () => { const open = crazy?.tune(); $('tune').setAttribute('aria-expanded', String(!!open)) }
 $('back').onclick = () => back()
 
 // ---------- start ----------

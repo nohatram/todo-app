@@ -1,17 +1,96 @@
 // Crazy mode: a chain of big gradient orbs behind the list, hanging from the cursor like a metal
 // chain, bouncing off the screen's edges. When nobody's touching it, an invisible hand plays with it.
-// Tuned in the Crazy Mode lab; these are the settings that came out of it.
-// startCrazy() puts the canvas behind the page and returns a function that removes it again.
+// startCrazy() puts the canvas behind the page and returns { stop, tune }: stop removes it again,
+// tune shows or hides the tuning panel. Tuned settings are kept per device.
 
-const S = {
+const DEFAULTS = {
   count: 7, size: 1.3, overlap: 0.22, gravity: 0.75, swing: 0.992, bounce: 0.82,
-  scale: 1.1, flow: 0.18, warp: 1.1, react: 1, shift: 0, trail: 0.85, smear: 1, grain: 0.03,
+  // palette sampled from the reference, violet end (at the hand) to yellow end
+  p0: '#c684e4', p1: '#9a9ce3', p2: '#60c9e3', p3: '#73d2b9', p4: '#85db94', p5: '#b1e860', p6: '#eee952',
+  scale: 1.1, flow: 0.18, warp: 1.1, react: 1, shift: 0, spread: 0.9, noise: 1.2, sheen: 1, trail: 0.85, smear: 1, grain: 0.03,
   ground: 0.6,
 }
-// palette sampled from the reference, violet end to yellow end
-const PALETTE = ['#c684e4', '#9a9ce3', '#60c9e3', '#73d2b9', '#85db94', '#b1e860', '#eee952']
-  .flatMap((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255))
+const KEY = 'crazy'
+const S = { ...DEFAULTS }
+try { const saved = JSON.parse(localStorage.getItem(KEY) || '{}'); for (const k in DEFAULTS) if (k in saved) S[k] = saved[k] } catch {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch {} }
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
 const MAX = 12
+
+// The tuning panel: [key, label, min, max, step]; a heading on its own is a string.
+const CONTROLS = [
+  'Chain',
+  ['count', 'Orbs', 2, MAX, 1], ['size', 'Size', 0.4, 2, 0.01], ['overlap', 'Overlap', 0, 0.7, 0.01],
+  ['gravity', 'Gravity', 0, 2.5, 0.01], ['swing', 'Swing', 0.95, 1, 0.0005], ['bounce', 'Bounce', 0, 0.95, 0.01],
+  'Gradient',
+  'palette',
+  ['spread', 'Spread', 0, 2, 0.01], ['shift', 'Shift', -1, 1, 0.01], ['noise', 'Noise', 0, 3, 0.01],
+  ['scale', 'Scale', 0.2, 4, 0.01], ['warp', 'Warp', 0, 3, 0.01], ['flow', 'Flow', 0, 1, 0.01],
+  ['react', 'React', 0, 2, 0.01], ['sheen', 'Sheen', 0, 3, 0.01],
+  ['trail', 'Trail', 0, 0.99, 0.005], ['smear', 'Smear', 0, 3, 0.01], ['grain', 'Grain', 0, 0.2, 0.005],
+  'Ground',
+  ['ground', 'Grey', 0.4, 0.85, 0.005],
+]
+const grey = (l) => { const v = Math.round(Math.min(Math.max(l, 0), 1) * 255); return `rgb(${v} ${v} ${v})` }
+// the page's greys follow the ground: paper is the ground, chips and rules a little darker
+function paint() {
+  const st = document.documentElement.style
+  st.setProperty('--paper', grey(S.ground))
+  st.setProperty('--chip', grey(S.ground - .067))
+  st.setProperty('--strong', grey(S.ground - .12))
+  st.setProperty('--rule', grey(S.ground - .1))
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', grey(S.ground))
+}
+function unpaint() {
+  const st = document.documentElement.style
+  for (const k of ['--paper', '--chip', '--strong', '--rule']) st.removeProperty(k)
+}
+
+function buildPanel() {
+  const el = document.createElement('div')
+  el.className = 'tune'
+  el.id = 'tune-panel'
+  el.hidden = true
+  el.setAttribute('role', 'region')
+  el.setAttribute('aria-label', 'Crazy mode controls')
+  const rows = CONTROLS.map((c) => {
+    if (c === 'palette') return `<div class="tune-row wide"><span>Colors</span><div class="tune-swatches">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<input type="color" data-k="p${i}" aria-label="Color ${i + 1} of 7">`).join('')}</div></div>`
+    if (typeof c === 'string') return `<h2>${c}</h2>`
+    const [k, label, min, max, step] = c
+    return `<label class="tune-row"><span>${label}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}"><output></output></label>`
+  }).join('')
+  el.innerHTML = rows + `<div class="tune-actions"><button type="button" data-act="copy" class="chip">Copy settings</button><button type="button" data-act="reset" class="chip">Reset</button><span class="tune-note" role="status"></span></div><textarea hidden readonly aria-label="Settings as JSON"></textarea>`
+  const sync = () => {
+    for (const input of el.querySelectorAll('[data-k]')) {
+      const k = input.dataset.k
+      input.value = S[k]
+      const out = input.parentElement.querySelector('output')
+      if (out) { const v = Number(S[k]); out.textContent = v.toFixed((input.step.split('.')[1] || '').length) }
+    }
+  }
+  el.addEventListener('input', (e) => {
+    const k = e.target.dataset?.k
+    if (!k) return
+    S[k] = e.target.type === 'color' ? e.target.value : Number(e.target.value)
+    save(); sync(); if (k === 'ground') paint()
+  })
+  el.addEventListener('click', (e) => {
+    const act = e.target.dataset?.act
+    const note = el.querySelector('.tune-note')
+    if (act === 'reset') { Object.assign(S, DEFAULTS); save(); sync(); paint() }
+    if (act === 'copy') {
+      const json = JSON.stringify(S, null, 2)
+      const fallback = () => { const t = el.querySelector('textarea'); t.hidden = false; t.value = json; t.focus(); t.select(); note.textContent = 'Select and copy' }
+      try { navigator.clipboard.writeText(json).then(() => { note.textContent = 'Copied'; setTimeout(() => { note.textContent = '' }, 1600) }, fallback) } catch { fallback() }
+    }
+  })
+  // keep the chain from chasing the cursor around inside the panel
+  el.addEventListener('pointermove', (e) => e.stopPropagation())
+  el.addEventListener('pointerdown', (e) => e.stopPropagation())
+  sync()
+  document.body.append(el)
+  return el
+}
 
 const SHAPE = `
 uniform int uCount;
@@ -38,7 +117,7 @@ const FIELD = `
 precision highp float;
 ${SHAPE}
 uniform vec2 uRes, uMouse;
-uniform float uTime, uScale, uFlow, uWarp, uReact, uSpeed, uShift, uKeep, uSmear, uDt;
+uniform float uTime, uScale, uFlow, uWarp, uReact, uSpeed, uShift, uSpread, uNoise, uSheen, uKeep, uSmear, uDt;
 uniform vec3 uPal[7];
 uniform vec2 uV[${MAX}];
 uniform sampler2D uPrev;
@@ -68,9 +147,9 @@ void main() {
   vec2 wq = q + warp * vec2(fbm(q + vec2(0., t)), fbm(q + vec2(5.2, 1.3) - t));
   float n = fbm(wq * 1.4 + t * .6);
   float near = exp(-length(p - uMouse) / (m * .22));
-  float x = along * .9 + (n - .5) * 1.2 + uShift - uReact * near * (.25 + .5 * uSpeed);
+  float x = along * uSpread + (n - .5) * uNoise + uShift - uReact * near * (.25 + .5 * uSpeed);
   vec3 fresh = pal(clamp(x, 0., 1.) * 6.);
-  fresh += smoothstep(.55, .95, fbm(wq * 2.2 - t)) * (.06 + .1 * uSpeed * uReact);
+  fresh += smoothstep(.55, .95, fbm(wq * 2.2 - t)) * (.06 + .1 * uSpeed * uReact) * uSheen;
 
   vel /= max(vs, 1e-4);
   vec4 prev = texture2D(uPrev, (p - vel * uDt * uSmear) / uRes);
@@ -101,10 +180,9 @@ export function startCrazy() {
   canvas.setAttribute('aria-hidden', 'true')
   document.body.prepend(canvas)
   const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false })
-  if (!gl) { canvas.remove(); return () => {} }
+  if (!gl) { canvas.remove(); return { stop() {}, tune() {} } }
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-  const flow = reduced ? 0 : S.flow
 
   function program(frag, names) {
     const sh = (type, src) => {
@@ -119,7 +197,7 @@ export function startCrazy() {
     for (const n of names) u[n] = gl.getUniformLocation(p, n)
     return { p, u, a: gl.getAttribLocation(p, 'a') }
   }
-  const field = program(FIELD, ['uCount', 'uB', 'uRes', 'uMouse', 'uTime', 'uScale', 'uFlow', 'uWarp', 'uReact', 'uSpeed', 'uShift', 'uKeep', 'uSmear', 'uDt', 'uPal', 'uV', 'uPrev'])
+  const field = program(FIELD, ['uCount', 'uB', 'uRes', 'uMouse', 'uTime', 'uScale', 'uFlow', 'uWarp', 'uReact', 'uSpeed', 'uShift', 'uSpread', 'uNoise', 'uSheen', 'uKeep', 'uSmear', 'uDt', 'uPal', 'uV', 'uPrev'])
   const page = program(PAGE, ['uCount', 'uB', 'uRes', 'uTime', 'uDpr', 'uGrain', 'uGround', 'uField'])
   const quad = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, quad)
@@ -316,15 +394,18 @@ export function startCrazy() {
     const fu = field.u
     gl.uniform2f(fu.uMouse, balls[0].x * dpr, (H - balls[0].y) * dpr)
     gl.uniform1f(fu.uScale, S.scale)
-    gl.uniform1f(fu.uFlow, flow)
+    gl.uniform1f(fu.uFlow, reduced ? 0 : S.flow)
     gl.uniform1f(fu.uWarp, S.warp)
     gl.uniform1f(fu.uReact, S.react)
     gl.uniform1f(fu.uSpeed, speed)
     gl.uniform1f(fu.uShift, S.shift)
+    gl.uniform1f(fu.uSpread, S.spread)
+    gl.uniform1f(fu.uNoise, S.noise)
+    gl.uniform1f(fu.uSheen, S.sheen)
     gl.uniform1f(fu.uKeep, Math.pow(S.trail, dt * 60))
     gl.uniform1f(fu.uSmear, S.smear)
     gl.uniform1f(fu.uDt, dt)
-    gl.uniform3fv(fu.uPal, PALETTE)
+    gl.uniform3fv(fu.uPal, [S.p0, S.p1, S.p2, S.p3, S.p4, S.p5, S.p6].flatMap(hex))
     gl.uniform2fv(fu.uV, V)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, read.tex)
     gl.uniform1i(fu.uPrev, 0)
@@ -348,7 +429,11 @@ export function startCrazy() {
   addEventListener('pointermove', onPointer)
   addEventListener('pointerdown', onPointer)
   addEventListener('resize', resize)
-  return () => {
+  paint()
+  const panel = buildPanel()
+  const stop = () => {
+    panel.remove()
+    unpaint()
     cancelAnimationFrame(raf)
     removeEventListener('pointermove', onPointer)
     removeEventListener('pointerdown', onPointer)
@@ -356,4 +441,6 @@ export function startCrazy() {
     gl.getExtension('WEBGL_lose_context')?.loseContext()
     canvas.remove()
   }
+  const tune = (show = panel.hidden) => { panel.hidden = !show; return show }
+  return { stop, tune }
 }
