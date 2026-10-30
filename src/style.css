@@ -39,6 +39,38 @@
   color-scheme: dark;
 }
 
+/* Crazy: halfway between light and dark, with a chain of gradient orbs behind the list (crazy.js).
+   The page ground is the canvas, so the grid moves onto #app, above it, and the current-line band
+   and selection go see-through so the orbs show under them. */
+:root[data-theme="crazy"] {
+  --paper: #999999;
+  --grid: rgb(0 0 0 / .05);
+  --band: rgb(0 0 0 / .07);
+  --chip: #888888;
+  --strong: #7a7a7a;
+  --ink: #1d1d1d;
+  --muted: #3a3a3a;
+  --faint: #5c5c5c;
+  --rule: #7f7f7f;
+  --caret: #1d1d1d;
+  --select: rgb(0 0 0 / .14);
+  --select-solid: #b4b4b4;
+  color-scheme: light;
+}
+.crazy-bg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; pointer-events: none; }
+:root[data-theme="crazy"] body { background-image: none; }
+:root[data-theme="crazy"] #app {
+  position: relative; z-index: 1;
+  background-image:
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid) 1px, transparent 1px);
+  background-size: 2ch var(--row);
+  background-position: calc(var(--colpad) + 2ch) 0;
+}
+/* section rules would need a paper-colored patch behind the label, so they go */
+:root[data-theme="crazy"] .cm-h3, :root[data-theme="crazy"] .cm-h3 .cm-h-text { background: none; }
+:root[data-theme="crazy"] .settings { position: relative; z-index: 1; }
+
 ::selection { background: var(--select-solid); }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }

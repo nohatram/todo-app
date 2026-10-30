@@ -1,6 +1,7 @@
 import './style.css'
 import { createClient, Conflict, AuthError } from './github.js'
 import { createEditor } from './editor.js'
+import { startCrazy } from './crazy.js'
 import { createLocalClient } from 'virtual:local'
 
 // The artifact build keeps files in this browser instead of GitHub (see local.js).
@@ -400,22 +401,32 @@ window.addEventListener('blur', () => modDown(false))
 $('addimg').onclick = () => $('imgpick').click()
 $('imgpick').onchange = (e) => { editor.insertImages(e.target.files); e.target.value = '' }
 
-// ---------- light / dark ----------
-// The button shows where it takes you: a moon in light mode, a sun in dark mode.
+// ---------- light / dark / crazy ----------
+// The button cycles light, dark, crazy and shows where it takes you next:
+// a moon in light mode, a chain of orbs in dark mode, a sun in crazy mode.
 const MOON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 10.4A5.6 5.6 0 0 1 5.6 3.4a5.6 5.6 0 1 0 7 7Z" fill="currentColor"/></svg>'
 const SUN = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="square"><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></g></svg>'
-
-function applyTheme(theme) {
-  const dark = theme === 'dark'
-  if (dark) document.documentElement.dataset.theme = 'dark'
-  else delete document.documentElement.dataset.theme
-  $('theme').innerHTML = dark ? SUN : MOON
-  $('theme').setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode')
-  document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#161616' : '#f7f7f7')
+const ORBS = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.6" cy="4.2" r="3.1" fill="currentColor"/><circle cx="8.6" cy="8" r="3.1" fill="currentColor" opacity=".7"/><circle cx="11.6" cy="12.2" r="3.1" fill="currentColor" opacity=".45"/></svg>'
+const THEMES = {
+  light: { next: 'dark', icon: MOON, label: 'Switch to dark mode', color: '#f7f7f7' },
+  dark: { next: 'crazy', icon: ORBS, label: 'Switch to crazy mode', color: '#161616' },
+  crazy: { next: 'light', icon: SUN, label: 'Switch to light mode', color: '#999999' },
+}
+let stopCrazy = null
+function applyTheme(name) {
+  const theme = THEMES[name] ? name : 'light'
+  const t = THEMES[theme]
+  if (theme === 'light') delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme = theme
+  $('theme').innerHTML = t.icon
+  $('theme').setAttribute('aria-label', t.label)
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.color)
+  if (theme === 'crazy' && !stopCrazy) stopCrazy = startCrazy()
+  if (theme !== 'crazy' && stopCrazy) { stopCrazy(); stopCrazy = null }
 }
 applyTheme((() => { try { return localStorage.getItem('theme') } catch { return null } })())
 $('theme').onclick = () => {
-  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+  const next = THEMES[document.documentElement.dataset.theme || 'light']?.next || 'dark'
   try { localStorage.setItem('theme', next) } catch {}
   applyTheme(next)
 }

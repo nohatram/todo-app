@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="theme-color" content="#f7f7f7" />
-    <script>try { if (localStorage.getItem('theme') === 'dark') { document.documentElement.dataset.theme = 'dark'; document.querySelector('meta[name=theme-color]').content = '#161616' } } catch (e) {}</script>
+    <script>try { var t = localStorage.getItem('theme'), c = { dark: '#161616', crazy: '#999999' }[t]; if (c) { document.documentElement.dataset.theme = t; document.querySelector('meta[name=theme-color]').content = c } } catch (e) {}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>List</title>
     <meta name="apple-mobile-web-app-capable" content="yes" />
