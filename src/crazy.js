@@ -8,7 +8,7 @@ const DEFAULTS = {
   // palette sampled from the reference, violet end (at the hand) to yellow end
   p0: '#c684e4', p1: '#9a9ce3', p2: '#60c9e3', p3: '#73d2b9', p4: '#85db94', p5: '#b1e860', p6: '#eee952',
   scale: 1.1, flow: 0.18, warp: 1.1, react: 1, shift: 0, glow: 0.5, spread: 0.9, noise: 1.2, sheen: 1, trail: 0.85, smear: 1, grain: 0.03,
-  ground: 0.6,
+  ground: 0.6, walls: true,
 }
 const KEY = 'crazy'
 const S = { ...DEFAULTS }
@@ -21,7 +21,7 @@ const MAX = 12
 const CONTROLS = [
   'Chain',
   ['count', 'Orbs', 2, MAX, 1], ['size', 'Size', 0.4, 2, 0.01], ['overlap', 'Overlap', 0, 0.7, 0.01],
-  ['gravity', 'Gravity', 0, 2.5, 0.01], ['swing', 'Swing', 0.95, 1, 0.0005], ['bounce', 'Bounce', 0, 0.95, 0.01],
+  ['gravity', 'Gravity', 0, 2.5, 0.01], ['swing', 'Swing', 0.95, 1, 0.0005], ['bounce', 'Bounce', 0, 0.95, 0.01], 'walls',
   'Gradient',
   'palette',
   ['spread', 'Spread', 0, 2, 0.01], ['shift', 'Shift', -1, 1, 0.01], ['noise', 'Noise', 0, 3, 0.01],
@@ -54,6 +54,7 @@ function buildPanel() {
   el.setAttribute('role', 'region')
   el.setAttribute('aria-label', 'Crazy mode controls')
   const rows = CONTROLS.map((c) => {
+    if (c === 'walls') return `<label class="tune-row wide tune-check"><input type="checkbox" data-k="walls"><span>Walls and floor</span></label>`
     if (c === 'palette') return `<div class="tune-row wide"><span>Colors</span><div class="tune-swatches">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<input type="color" data-k="p${i}" aria-label="Color ${i + 1} of 7">`).join('')}</div></div>`
     if (typeof c === 'string') return `<h2>${c}</h2>`
     const [k, label, min, max, step] = c
@@ -63,7 +64,8 @@ function buildPanel() {
   const sync = () => {
     for (const input of el.querySelectorAll('[data-k]')) {
       const k = input.dataset.k
-      input.value = S[k]
+      if (input.type === 'checkbox') input.checked = S[k]
+      else input.value = S[k]
       const out = input.parentElement.querySelector('output')
       if (out) { const v = Number(S[k]); out.textContent = v.toFixed((input.step.split('.')[1] || '').length) }
     }
@@ -71,7 +73,8 @@ function buildPanel() {
   el.addEventListener('input', (e) => {
     const k = e.target.dataset?.k
     if (!k) return
-    S[k] = e.target.type === 'color' ? e.target.value : Number(e.target.value)
+    const t = e.target.type
+    S[k] = t === 'checkbox' ? e.target.checked : t === 'color' ? e.target.value : Number(e.target.value)
     save(); sync(); if (k === 'ground') paint()
   })
   el.addEventListener('click', (e) => {
@@ -314,14 +317,14 @@ export function startCrazy() {
       const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6
       const ox = b.x, oy = b.y
       if (d > link) { b.x = a.x + dx / d * link; b.y = a.y + dy / d * link }
-      walls(b, r)
+      if (S.walls) walls(b, r)
       fix[i * 2] = b.x - ox; fix[i * 2 + 1] = b.y - oy
     }
     for (let i = 1; i < S.count - 1; i++) {
       balls[i].px += fix[(i + 1) * 2] * 0.9
       balls[i].py += fix[(i + 1) * 2 + 1] * 0.9
     }
-    for (let i = 1; i < S.count; i++) bounce(balls[i], r, h)
+    if (S.walls) for (let i = 1; i < S.count; i++) bounce(balls[i], r, h)
     const cap = 2600 * h * (Math.min(W, H) / 900)
     for (let i = 1; i < S.count; i++) {
       const b = balls[i], vx = b.x - b.px, vy = b.y - b.py, sp = Math.hypot(vx, vy)
