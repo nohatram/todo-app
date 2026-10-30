@@ -240,13 +240,28 @@ export function startCrazy() {
   resize()
 
   // ---------- the chain ----------
-  // The first orb is held at the cursor; the rest are loose weights under gravity, joined by links
-  // that can't stretch. Verlet integration at a fixed 120 steps a second keeps it stable.
+  // The first orb is held by an invisible hand; the rest are loose weights under gravity, joined by
+  // links that can't stretch. Verlet integration at a fixed 120 steps a second keeps it stable.
+  // Left alone, the hand wanders around on its own. Wiggle the pointer and it notices, comes over and
+  // follows the pointer until it settles, then wanders off again.
   const pointer = { x: W * .5, y: H * .25, last: -1e9 }
   let speed = 0
   const radius = () => S.size * Math.min(W, H) * 0.16
   const balls = Array.from({ length: MAX }, () => ({ x: W * .5, y: H * .5, px: W * .5, py: H * .5, vx: 0, vy: 0 }))
-  const onPointer = (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.last = performance.now() }
+  // Wiggle: the pointer changing direction three times within 0.7s, with real moves in between.
+  // A plain move across the screen (to click something) doesn't count.
+  const attn = { on: false, flips: [], dx: 0, dy: 0 }
+  const onPointer = (e) => {
+    const now = performance.now(), dx = e.clientX - pointer.x, dy = e.clientY - pointer.y
+    pointer.x = e.clientX; pointer.y = e.clientY; pointer.last = now
+    if (e.type !== 'pointermove') { attn.dx = attn.dy = 0; return }
+    const ax = Math.abs(dx) > 3, ay = Math.abs(dy) > 3
+    if ((ax && dx * attn.dx < 0) || (ay && dy * attn.dy < 0)) attn.flips.push(now)
+    if (ax) attn.dx = dx
+    if (ay) attn.dy = dy
+    while (attn.flips.length && now - attn.flips[0] > 700) attn.flips.shift()
+    if (attn.flips.length >= 3) attn.on = true
+  }
 
   // Idle: an invisible hand picks a move, makes it with a little overshoot, then picks another after
   // a random wait: lazy drifts, quick darts, a drop into the floor, a shake in place, or a pause.
@@ -272,7 +287,7 @@ export function startCrazy() {
   }
   function roam(h, t) {
     const w = wander
-    if (t >= w.next) pick(t)
+    if (!reduced && t >= w.next) pick(t)
     const damp = 2 * w.z * Math.sqrt(w.k)
     w.vx += (w.k * (w.tx - w.x) - damp * w.vx) * h; w.x += w.vx * h
     w.vy += (w.k * (w.ty - w.y) - damp * w.vy) * h; w.y += w.vy * h
@@ -337,32 +352,40 @@ export function startCrazy() {
     }
   }
 
-  // The hand's move between two frames is spread over the physics steps in between, so a fast
-  // flick swings the chain instead of teleporting the first orb.
+  // Following: the hand springs after the pointer, so he swoops over with a little overshoot and
+  // trails it slightly. When he first notices, he gives a quick excited shake.
+  function chase(h, t) {
+    const w = wander
+    w.tx = pointer.x; w.ty = pointer.y; w.k = 80; w.z = .55
+    return roam(h, t)
+  }
+
+  // The hand is stepped along with the physics, 120 times a second, so every move is smooth.
   const STEP = 1 / 120
-  let acc = 0, hand = null, wasIdle = false
+  let acc = 0, following = false
   function step(dt, t, now) {
-    const idle = !reduced && now - pointer.last > 2500
-    if (idle && !wasIdle) {
-      const h0 = hand || { x: W * .5, y: H * .3 }
-      Object.assign(wander, { x: h0.x, y: h0.y, vx: 0, vy: 0, tx: h0.x, ty: h0.y, next: t + .4, shakeTo: 0 })
+    // notice a wiggle; lose interest once the pointer has been still for most of a second
+    if (attn.on && now - pointer.last > 900) { attn.on = false; attn.flips = [] }
+    if (attn.on && !following) {
+      following = true
+      Object.assign(wander, { shakeFrom: t, shakeTo: t + .3, shakeAmp: radius() * .22, next: Infinity })
+    } else if (!attn.on && following) {
+      following = false
+      // stay put for a beat, then wander off
+      Object.assign(wander, { tx: wander.x, ty: wander.y, k: 30, z: .7, next: t + rand(.5, 1.2) })
     }
-    wasIdle = idle
-    const goal = { x: pointer.x, y: pointer.y }, from = hand || goal
     acc = Math.min(acc + dt, 0.1)
     const n = Math.floor(acc / STEP)
-    let at = goal
     for (let k = 1; k <= n; k++) {
-      at = idle ? roam(STEP, t - (n - k) * STEP) : { x: from.x + (goal.x - from.x) * k / n, y: from.y + (goal.y - from.y) * k / n }
-      tick(STEP, at)
+      const tk = t - (n - k) * STEP
+      tick(STEP, following ? chase(STEP, tk) : roam(STEP, tk))
     }
     acc -= n * STEP
-    if (n) hand = at
   }
   {
     const start = { x: W * .5, y: H * .3 }, link = 2 * radius() * (1 - S.overlap)
     balls.forEach((b, i) => { b.x = b.px = start.x; b.y = b.py = Math.min(start.y + i * link, H - radius()) })
-    hand = start
+    Object.assign(wander, { x: start.x, y: start.y, tx: start.x, ty: start.y, next: 20.5 })
   }
   for (let i = 0; i < 180; i++) step(1 / 60, 20 + i / 60, 0)
 
