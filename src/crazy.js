@@ -248,8 +248,8 @@ export function startCrazy() {
   let speed = 0
   const radius = () => S.size * Math.min(W, H) * 0.16
   const balls = Array.from({ length: MAX }, () => ({ x: W * .5, y: H * .5, px: W * .5, py: H * .5, vx: 0, vy: 0 }))
-  // Wiggle: the pointer changing direction three times within 0.7s, with real moves in between.
-  // A plain move across the screen (to click something) doesn't count.
+  // Wiggle: the pointer changing direction 6 times within 2 seconds, with real moves in between.
+  // Ordinary mousing around doesn't count.
   const attn = { on: false, flips: [], dx: 0, dy: 0 }
   const onPointer = (e) => {
     const now = performance.now(), dx = e.clientX - pointer.x, dy = e.clientY - pointer.y
@@ -259,8 +259,8 @@ export function startCrazy() {
     if ((ax && dx * attn.dx < 0) || (ay && dy * attn.dy < 0)) attn.flips.push(now)
     if (ax) attn.dx = dx
     if (ay) attn.dy = dy
-    while (attn.flips.length && now - attn.flips[0] > 700) attn.flips.shift()
-    if (attn.flips.length >= 3) attn.on = true
+    while (attn.flips.length && now - attn.flips[0] > 2000) attn.flips.shift()
+    if (attn.flips.length >= 6) attn.on = true
   }
 
   // Idle: an invisible hand picks a move, makes it with a little overshoot, then picks another after
