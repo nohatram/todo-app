@@ -123,6 +123,7 @@ const FIELD = `
 precision highp float;
 ${SHAPE}
 uniform vec2 uRes, uMouse;
+uniform float uFieldScale;
 uniform float uTime, uScale, uFlow, uWarp, uReact, uSpeed, uShift, uSpread, uNoise, uSheen, uGlow, uR, uKeep, uSmear, uDt;
 uniform vec3 uPal[7];
 uniform vec2 uV[${MAX}];
@@ -133,7 +134,10 @@ vec3 pal(float x) {
   return c;
 }
 void main() {
-  vec2 p = gl_FragCoord.xy;
+  // this pass runs at a fraction of the screen's resolution; p is in screen pixels
+  vec2 p = gl_FragCoord.xy / uFieldScale;
+  // nothing to color outside the orbs (a few pixels of margin keep the edges clean when scaled up)
+  if (shape(p) > 6. / uFieldScale) { gl_FragColor = vec4(0.); return; }
   float m = min(uRes.x, uRes.y);
   float wsum = 0., tsum = 0.;
   vec2 vel = vec2(0.); float vs = 0.;
@@ -188,7 +192,7 @@ export function startCrazy() {
   canvas.className = 'crazy-bg'
   canvas.setAttribute('aria-hidden', 'true')
   document.body.prepend(canvas)
-  const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false })
+  const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false, alpha: false, depth: false, stencil: false, powerPreference: 'low-power' })
   if (!gl) { canvas.remove(); return { stop() {}, tune() {} } }
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -206,20 +210,24 @@ export function startCrazy() {
     for (const n of names) u[n] = gl.getUniformLocation(p, n)
     return { p, u, a: gl.getAttribLocation(p, 'a') }
   }
-  const field = program(FIELD, ['uCount', 'uB', 'uRes', 'uMouse', 'uTime', 'uScale', 'uFlow', 'uWarp', 'uReact', 'uSpeed', 'uShift', 'uSpread', 'uNoise', 'uSheen', 'uGlow', 'uR', 'uKeep', 'uSmear', 'uDt', 'uPal', 'uV', 'uPrev'])
+  const field = program(FIELD, ['uCount', 'uB', 'uRes', 'uMouse', 'uFieldScale', 'uTime', 'uScale', 'uFlow', 'uWarp', 'uReact', 'uSpeed', 'uShift', 'uSpread', 'uNoise', 'uSheen', 'uGlow', 'uR', 'uKeep', 'uSmear', 'uDt', 'uPal', 'uV', 'uPrev'])
   const page = program(PAGE, ['uCount', 'uB', 'uRes', 'uTime', 'uDpr', 'uGrain', 'uGround', 'uField'])
   const quad = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, quad)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
 
-  // two color-field buffers, swapped every frame (read last frame's, write this frame's)
-  let targets = []
+  // Two color-field buffers, swapped every frame (read last frame's, write this frame's). The color
+  // field is soft, so it's worked out at half resolution and scaled up; the orb edges and the grain
+  // are still drawn at full resolution in the second pass.
+  const FIELD_SCALE = .5
+  let targets = [], fw = 1, fh = 1
   function makeTargets() {
     for (const t of targets) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb) }
+    fw = Math.max(1, Math.round(canvas.width * FIELD_SCALE)); fh = Math.max(1, Math.round(canvas.height * FIELD_SCALE))
     targets = [0, 1].map(() => {
       const tex = gl.createTexture()
       gl.bindTexture(gl.TEXTURE_2D, tex)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, fw, fh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -233,9 +241,11 @@ export function startCrazy() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
-  let W = 0, H = 0, dpr = 1
+  // Resolution steps down if the computer can't keep up (see frame()); it never goes above 1.5x.
+  const SHARPNESS = [1.5, 1.25, 1]
+  let W = 0, H = 0, dpr = 1, quality = 0
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    dpr = Math.min(window.devicePixelRatio || 1, SHARPNESS[quality])
     W = canvas.clientWidth; H = canvas.clientHeight
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr)
     makeTargets()
@@ -323,6 +333,7 @@ export function startCrazy() {
     if (b.x >= W - r - 0.5 && vx > 0) b.px = vx > slow ? b.x + vx * e : b.x
   }
 
+  const fix = new Float32Array(MAX * 2)
   function tick(h, target) {
     const r = radius(), link = 2 * r * (1 - S.overlap)
     const g = S.gravity * 2600 * (Math.min(W, H) / 900)
@@ -340,7 +351,7 @@ export function startCrazy() {
     }
     // links only pull when stretched; solved from the hand down, then each orb gives back most of
     // the pull it handed on, so a quick yank doesn't throw the chain into the air
-    const fix = new Float32Array(S.count * 2)
+    fix.fill(0, 0, S.count * 2)
     if (nap && S.walls) walls(head, r)
     for (let i = 1; i < S.count; i++) {
       const a = balls[i - 1], b = balls[i]
@@ -387,7 +398,8 @@ export function startCrazy() {
     speech.className = 'crazy-speech'
     void speech.offsetWidth  // restart the pop-in
     speech.className = 'crazy-speech on'
-    const room = speech.offsetHeight + 24
+    speechSize = { w: speech.offsetWidth, h: speech.offsetHeight }
+    const room = speechSize.h + 24
     const w = wander
     attn.on = false; attn.flips = []
     if (opts.move !== false) {
@@ -422,12 +434,14 @@ export function startCrazy() {
     if (wander.next === Infinity && !following && !trick) wander.next = t + rand(.3, .8)
     if (errand) errandHushed(t)
   }
+  // (its size is measured once when he starts a line, so moving it never forces a layout)
+  let speechSize = { w: 0, h: 0 }
   function placeSpeech(r) {
     if (!talk && !speech.classList.contains('off')) return
-    const half = speech.offsetWidth / 2 + 12
+    const half = speechSize.w / 2 + 12
     const x = Math.min(Math.max(balls[0].x, half), W - half)
-    const y = Math.max(balls[0].y - r - 10, speech.offsetHeight + 12)
-    speech.style.left = x + 'px'; speech.style.top = y + 'px'
+    const y = Math.max(balls[0].y - r - 10, speechSize.h + 12)
+    speech.style.left = x.toFixed(1) + 'px'; speech.style.top = y.toFixed(1) + 'px'
   }
 
   // ---------- errands ----------
@@ -481,20 +495,19 @@ export function startCrazy() {
   paper.className = 'crazy-paper'; paper.hidden = true
   paper.innerHTML = '<canvas width="120" height="90" aria-label="A drawing he made you"></canvas>'
   document.body.append(paper)
-  let sway = 0, falling = null
+  let sway = 0, falling = null, paperW = 0, paperAt = { x: 0, y: 0 }
   function placePaper(r, dt) {
     if (paper.hidden || falling) return
     const head = balls[0], w = Math.min(r * 1.45, 280)
     sway += ((-head.vx / 90) - sway) * Math.min(dt * 6, 1)
     sway = Math.max(-14, Math.min(14, sway))
-    paper.style.width = w + 'px'
-    paper.style.left = (head.x - w / 2) + 'px'
-    paper.style.top = (head.y + r * .05) + 'px'
-    paper.style.transform = `rotate(${(-4 + sway).toFixed(2)}deg)`
+    if (paperW !== Math.round(w)) { paperW = Math.round(w); paper.style.width = paperW + 'px' }
+    paperAt = { x: head.x - paperW / 2, y: head.y + r * .05 }
+    paper.style.transform = `translate(${paperAt.x.toFixed(1)}px, ${paperAt.y.toFixed(1)}px) rotate(${(-4 + sway).toFixed(2)}deg)`
   }
   // let go, it rocks side to side on the way down, tilting into each swing
   function dropPaper() {
-    falling = { x0: parseFloat(paper.style.left) || 0, y: parseFloat(paper.style.top) || 0, phase: Math.PI / 2, amp: rand(40, 70), period: rand(1.5, 2), rot: -4 + sway }
+    falling = { x0: paperAt.x, y: paperAt.y, phase: Math.PI / 2, amp: rand(40, 70), period: rand(1.5, 2), rot: -4 + sway }
     paper.style.transformOrigin = '50% 30%'
   }
   function fallPaper(dt) {
@@ -504,9 +517,7 @@ export function startCrazy() {
     const s = Math.sin(f.phase), c = Math.cos(f.phase)
     f.y += (35 + 120 * c * c) * dt
     f.rot += (24 * c - f.rot) * Math.min(dt * 5, 1)
-    paper.style.left = (f.x0 + f.amp * (s - 1)) + 'px'
-    paper.style.top = f.y + 'px'
-    paper.style.transform = `rotate(${f.rot.toFixed(2)}deg)`
+    paper.style.transform = `translate(${(f.x0 + f.amp * (s - 1)).toFixed(1)}px, ${f.y.toFixed(1)}px) rotate(${f.rot.toFixed(2)}deg)`
     if (f.y > innerHeight + 20) { falling = null; paper.hidden = true; paper.style.transformOrigin = '' }
   }
 
@@ -647,8 +658,15 @@ export function startCrazy() {
     gl.uniform2f(prog.u.uRes, canvas.width, canvas.height)
     gl.uniform1f(prog.u.uTime, clock)
   }
+  let palKey = '', pal = [], slow = 0, settled = performance.now()
   function frame(now) {
+    raf = requestAnimationFrame(frame)
+    // On 120Hz screens draw every other refresh: it looks the same and halves the work.
+    if (now - last < 11) return
     const dt = Math.min((now - last) / 1000, 0.05); last = now
+    // If most recent frames came in slower than ~45 a second, drop to the next resolution step.
+    slow = slow * .95 + (dt > .022 ? .05 : 0)
+    if (slow > .6 && quality < SHARPNESS.length - 1 && now - settled > 3000) { quality++; settled = now; slow = 0; resize() }
     clock += dt
     step(dt, clock, now)
     const r = radius()
@@ -666,9 +684,10 @@ export function startCrazy() {
     const read = targets[cur], write = targets[1 - cur]
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fb)
-    gl.viewport(0, 0, canvas.width, canvas.height)
+    gl.viewport(0, 0, fw, fh)
     use(field)
     const fu = field.u
+    gl.uniform1f(fu.uFieldScale, fw / canvas.width)
     gl.uniform2f(fu.uMouse, balls[0].x * dpr, (H - balls[0].y) * dpr)
     gl.uniform1f(fu.uScale, S.scale)
     gl.uniform1f(fu.uFlow, reduced ? 0 : S.flow)
@@ -684,13 +703,16 @@ export function startCrazy() {
     gl.uniform1f(fu.uKeep, Math.pow(S.trail, dt * 60))
     gl.uniform1f(fu.uSmear, S.smear)
     gl.uniform1f(fu.uDt, dt)
-    gl.uniform3fv(fu.uPal, [S.p0, S.p1, S.p2, S.p3, S.p4, S.p5, S.p6].flatMap(hex))
+    const key = S.p0 + S.p1 + S.p2 + S.p3 + S.p4 + S.p5 + S.p6
+    if (key !== palKey) { palKey = key; pal = [S.p0, S.p1, S.p2, S.p3, S.p4, S.p5, S.p6].flatMap(hex) }
+    gl.uniform3fv(fu.uPal, pal)
     gl.uniform2fv(fu.uV, V)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, read.tex)
     gl.uniform1i(fu.uPrev, 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, canvas.width, canvas.height)
     use(page)
     const pu = page.u
     gl.uniform1f(pu.uDpr, dpr)
@@ -701,7 +723,6 @@ export function startCrazy() {
     gl.drawArrays(gl.TRIANGLES, 0, 3)
 
     cur = 1 - cur
-    raf = requestAnimationFrame(frame)
   }
   raf = requestAnimationFrame(frame)
 

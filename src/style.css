@@ -219,6 +219,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none;
 }
 .crazy-speech {
+  /* background-clip: text only paints inside the box, so the padding leaves room for descenders */
+  padding: .1em .15em .3em;
   max-width: min(22ch, 80vw); text-align: center; text-transform: none; letter-spacing: 0;
   font-size: clamp(24px, 3.4vw, 42px); line-height: 1.12;
   filter: drop-shadow(0 1px 0 rgb(0 0 0 / .35)) drop-shadow(0 0 10px rgb(0 0 0 / .12));
@@ -231,9 +233,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .crazy-speech .untyped { visibility: hidden; }
 .crazy-speech .caret { display: inline-block; width: 0; overflow: visible; white-space: nowrap; }
 .crazy-speech .caret::after { content: '|'; font-weight: 400; animation: crazy-blink .9s steps(1) infinite; }
-.crazy-zz { line-height: 1; filter: drop-shadow(0 1px 0 rgb(0 0 0 / .3)); }
+.crazy-zz { line-height: 1; padding: .1em .15em .25em; filter: drop-shadow(0 1px 0 rgb(0 0 0 / .3)); }
 .crazy-paper {
-  position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none;
+  position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none; will-change: transform;
   background: #fff; padding: 6px; transform-origin: 50% 0;
   box-shadow: 0 2px 0 rgb(0 0 0 / .12), 0 8px 18px rgb(0 0 0 / .18);
 }
