@@ -150,6 +150,26 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 .cm-h3 .cm-h-text { background: var(--paper); padding-right: 1ch; }
 .cm-today-date { color: var(--muted); margin-left: 2ch; font-size: 13px; text-transform: lowercase; }
+.cm-today-tally { margin-left: 2ch; }
+
+/* done: the line fades; just finished, his colors sweep left to right across its row(s) first */
+.cm-line.cm-done { opacity: .42; }
+.cm-done-check { margin-left: 1ch; font-size: 13px; }
+.cm-content { touch-action: pan-y; }
+.cm-line.cm-done-new { position: relative; z-index: 0; animation: done-dim 1.2s ease forwards; }
+.cm-line.cm-done-new::before {
+  content: ''; position: absolute; inset: 0 -1ch 0 -1ch; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, #c684e4, #9a9ce3, #60c9e3, #73d2b9, #85db94, #b1e860, #eee952);
+  animation: done-sweep 1.2s cubic-bezier(.25, .7, .25, 1) forwards;
+}
+@keyframes done-sweep {
+  0% { clip-path: inset(0 100% 0 0); opacity: .95; }
+  45% { clip-path: inset(0 0 0 0); opacity: .95; }
+  65% { clip-path: inset(0 0 0 0); opacity: .95; }
+  100% { clip-path: inset(0 0 0 0); opacity: 0; }
+}
+@keyframes done-dim { 0%, 55% { opacity: 1; } 100% { opacity: .42; } }
+@media (prefers-reduced-motion: reduce) { .cm-line.cm-done-new, .cm-line.cm-done-new::before { animation: none; } .cm-line.cm-done-new::before { display: none; } }
 
 /* task lines */
 .cm-sub { color: var(--muted); }

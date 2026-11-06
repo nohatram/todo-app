@@ -1,6 +1,6 @@
 // CodeMirror setup: plain-text lines (list markers hidden), heading labels, a left margin with an
 // "open page" arrow on the current line, and keyboard navigation.
-import { EditorState, Annotation, StateField } from '@codemirror/state'
+import { EditorState, Annotation, StateField, StateEffect } from '@codemirror/state'
 import {
   EditorView, Decoration, ViewPlugin, WidgetType, keymap, drawSelection,
   gutter, GutterMarker, highlightActiveLine, highlightActiveLineGutter,
@@ -19,6 +19,10 @@ const MDLINK = /(?<!!)\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g
 const BARE = /\bhttps?:\/\/[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"]/g
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
 const IMAGE = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g
+// Done: a task ending in " - done" (any case) or " DONE", optionally before its [[page]] link.
+// A plain lowercase " done" doesn't count, so "get it done" stays a task.
+const DONE = /(?:\s+[-–—]\s*[Dd][Oo][Nn][Ee]|\s+DONE)(?=\s*(?:\[\[[^\]\n]*\]\]\s*)?$)/
+const TRAILING_LINK = /\s*\[\[[^\]\n]*\]\]\s*$/
 
 const remote = Annotation.define()
 const hide = Decoration.replace({})
@@ -31,6 +35,45 @@ function frontmatterEnd(doc) {
   return 0
 }
 const isTask = (doc, line) => line.text.trim() !== '' && !HEADING.test(line.text) && line.number > frontmatterEnd(doc)
+const isDone = (doc, line) => isTask(doc, line) && DONE.test(line.text)
+
+// The Today section's tally: top-level tasks under "## Today", and how many are done.
+function todayTally(doc) {
+  let on = false, done = 0, total = 0
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n), text = line.text
+    if (/^#{1,2}\s/.test(text)) { if (on) break; on = /^##\s+today\s*$/i.test(text); continue }
+    if (!on || /^\s/.test(text) || !isTask(doc, line) || text.includes('![')) continue
+    total++
+    if (DONE.test(text)) done++
+  }
+  return { done, total }
+}
+
+// Mark the lines under the cursor done, or not done if they all already are.
+function toggleDone(view, nums, want) {
+  const doc = view.state.doc
+  const lines = nums.map((n) => doc.line(n)).filter((l) => isTask(doc, l))
+  if (!lines.length) return false
+  if (want === undefined) want = !lines.every((l) => DONE.test(l.text))
+  const changes = []
+  for (const l of lines) {
+    const m = DONE.exec(l.text)
+    if (!want && m) changes.push({ from: l.from + m.index, to: l.from + m.index + m[0].length })
+    if (want && !m) {
+      const link = TRAILING_LINK.exec(l.text)
+      const end = link ? link.index : l.text.trimEnd().length
+      changes.push({ from: l.from + end, insert: ' - DONE' })
+    }
+  }
+  if (changes.length) view.dispatch({ changes, userEvent: 'input.done' })
+  return true
+}
+const selectedLines = (state) => {
+  const nums = new Set()
+  for (const r of state.selection.ranges) for (let n = state.doc.lineAt(r.from).number; n <= state.doc.lineAt(r.to).number; n++) nums.add(n)
+  return [...nums]
+}
 const linkOf = (text) => /\[\[([^\]\n]+)\]\]/.exec(text)?.[1].trim()
 
 function slugFor(text) {
@@ -40,14 +83,33 @@ function slugFor(text) {
 
 // ---------- widgets ----------
 class DateWidget extends WidgetType {
-  eq() { return true }
+  constructor(tally) { super(); this.tally = tally }
+  eq(o) { return o.tally.done === this.tally.done && o.tally.total === this.tally.total }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-today-date'
     s.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    if (this.tally.total) {
+      const c = document.createElement('span')
+      c.className = 'cm-today-tally'
+      c.textContent = `${this.tally.done}/${this.tally.total} done`
+      s.append(c)
+    }
     return s
   }
 }
+// In place of the " - DONE" text, a small check (the text comes back while you're on that line).
+class CheckWidget extends WidgetType {
+  eq() { return true }
+  toDOM() {
+    const s = document.createElement('span')
+    s.className = 'cm-done-check'
+    s.textContent = '✓'
+    s.setAttribute('aria-label', 'done')
+    return s
+  }
+}
+const checkWidget = new CheckWidget()
 
 // ---------- images ----------
 // Each image line gets the picture drawn below it. Block widgets have to come from a state field.
@@ -88,10 +150,11 @@ const images = StateField.define({
 })
 
 // ---------- live preview ----------
-function build(view) {
+function build(view, fresh = []) {
   const decos = []
   const { state } = view
   const doc = state.doc
+  const tally = todayTally(doc)
   const active = new Set()
   if (view.hasFocus) for (const r of state.selection.ranges) {
     for (let n = doc.lineAt(r.from).number; n <= doc.lineAt(r.to).number; n++) active.add(n)
@@ -112,7 +175,7 @@ function build(view) {
           decos.push(Decoration.line({ class: `cm-h cm-h${h[1].length}` }).range(line.from))
           if (!editing) decos.push(hide.range(line.from, line.from + h[0].length))
           if (line.to > line.from + h[0].length) decos.push(Decoration.mark({ class: 'cm-h-text' }).range(line.from + h[0].length, line.to))
-          if (/^##\s+today\s*$/i.test(text)) decos.push(Decoration.widget({ widget: new DateWidget(), side: 1 }).range(line.to))
+          if (/^##\s+today\s*$/i.test(text)) decos.push(Decoration.widget({ widget: new DateWidget(tally), side: 1 }).range(line.to))
         }
         const m = LIST.exec(text)
         if (m) {
@@ -145,6 +208,14 @@ function build(view) {
           const a = line.from + im.index
           decos.push(editing ? Decoration.mark({ class: 'cm-imgsrc' }).range(a, a + im[0].length) : hide.range(a, a + im[0].length))
         }
+        const d = !h && isTask(doc, line) && DONE.exec(text)
+        if (d) {
+          // just finished: the highlight sweeps across the row(s) before the line fades
+          const isNew = fresh.some((f) => f >= line.from && f <= line.to)
+          decos.push(Decoration.line({ class: isNew ? 'cm-done cm-done-new' : 'cm-done' }).range(line.from))
+          const a = line.from + d.index
+          decos.push(editing ? Decoration.mark({ class: 'cm-done-raw' }).range(a, a + d[0].length) : Decoration.replace({ widget: checkWidget }).range(a, a + d[0].length))
+        }
         for (const c of text.matchAll(MENTION)) {
           decos.push(Decoration.mark({ class: 'cm-claude' }).range(line.from + c.index, line.from + c.index + c[0].length))
         }
@@ -155,16 +226,87 @@ function build(view) {
   return Decoration.set(decos, true)
 }
 
+// Lines that just became done (by typing, Cmd/Ctrl+D or a swipe) get the sweep once; the class
+// comes off when it's over, so a redrawn line doesn't play it again. Loads from GitHub never animate.
+const sweepDone = StateEffect.define()
+const SWEEP_MS = 1300
 const preview = ViewPlugin.fromClass(
   class {
-    constructor(view) { this.decorations = build(view) }
-    update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet || u.focusChanged) this.decorations = build(u.view) }
+    constructor(view) { this.fresh = []; this.decorations = build(view) }
+    update(u) {
+      let changed = false
+      if (u.docChanged) {
+        this.fresh = this.fresh.map((p) => u.changes.mapPos(p))
+        if (!u.transactions.some((tr) => tr.annotation(remote))) {
+          const before = u.startState.doc, after = u.state.doc
+          u.changes.iterChangedRanges((fa, ta, fb, tb) => {
+            for (let n = after.lineAt(fb).number; n <= after.lineAt(tb).number; n++) {
+              const line = after.line(n)
+              if (!isDone(after, line)) continue
+              const old = before.lineAt(Math.min(u.changes.invertedDesc.mapPos(line.from, 1), before.length))
+              if (isDone(before, old)) continue
+              this.fresh.push(line.from)
+              changed = true
+              setTimeout(() => u.view.dispatch({ effects: sweepDone.of(null) }), SWEEP_MS)
+            }
+          })
+        }
+      }
+      if (u.transactions.some((tr) => tr.effects.some((e) => e.is(sweepDone)))) { this.fresh.shift(); changed = true }
+      if (changed || u.docChanged || u.viewportChanged || u.selectionSet || u.focusChanged) this.decorations = build(u.view, this.fresh)
+    }
   },
   {
     decorations: (v) => v.decorations,
     provide: (p) => EditorView.atomicRanges.of((view) => view.plugin(p)?.decorations ?? Decoration.none),
   },
 )
+
+// ---------- swipe a line on a phone: right for done, left for not done ----------
+const swipe = ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.view = view; this.s = null
+    const dom = view.contentDOM
+    this.start = (e) => {
+      if (e.touches.length !== 1) return
+      const t = e.touches[0], pos = view.posAtCoords({ x: t.clientX, y: t.clientY })
+      if (pos == null) return
+      const line = view.state.doc.lineAt(pos)
+      if (!isTask(view.state.doc, line)) return
+      const el = view.domAtPos(line.from).node
+      this.s = { x: t.clientX, y: t.clientY, n: line.number, el: (el.nodeType === 1 ? el : el.parentElement)?.closest('.cm-line'), dx: 0, on: false }
+    }
+    this.move = (e) => {
+      const s = this.s
+      if (!s || !s.el) return
+      const t = e.touches[0], dx = t.clientX - s.x, dy = t.clientY - s.y
+      if (!s.on) {
+        if (Math.abs(dy) > 10) { this.s = null; return }   // it's a scroll
+        if (Math.abs(dx) < 12) return
+        s.on = true
+      }
+      s.dx = dx
+      s.el.style.transform = `translateX(${Math.max(-60, Math.min(60, dx * .5)).toFixed(1)}px)`
+    }
+    this.end = () => {
+      const s = this.s
+      this.s = null
+      if (!s || !s.on) return
+      if (s.el) { s.el.style.transition = 'transform .2s ease'; s.el.style.transform = ''; setTimeout(() => { if (s.el) s.el.style.transition = '' }, 220) }
+      if (s.dx > 70) toggleDone(view, [s.n], true)
+      if (s.dx < -70) toggleDone(view, [s.n], false)
+    }
+    dom.addEventListener('touchstart', this.start, { passive: true })
+    dom.addEventListener('touchmove', this.move, { passive: true })
+    dom.addEventListener('touchend', this.end)
+    dom.addEventListener('touchcancel', this.end)
+  }
+  destroy() {
+    const dom = this.view.contentDOM
+    dom.removeEventListener('touchstart', this.start); dom.removeEventListener('touchmove', this.move)
+    dom.removeEventListener('touchend', this.end); dom.removeEventListener('touchcancel', this.end)
+  }
+})
 
 // ---------- left margin: open-page arrow ----------
 class Marker extends GutterMarker {
@@ -276,6 +418,7 @@ export function createEditor(parent, { onChange, onLink, onBack, onImage, loadIm
       syntaxHighlighting(highlight),
       preview,
       images,
+      swipe,
       EditorView.domEventHandlers({
         // Cmd/Ctrl-click opens a link in a new tab; on a phone a tap does, since there's no Cmd key.
         mousedown(e) {
@@ -302,6 +445,8 @@ export function createEditor(parent, { onChange, onLink, onBack, onImage, loadIm
       }),
       keymap.of([
         { key: 'Mod-Enter', run: (v) => openLine(v, v.state.doc.lineAt(v.state.selection.main.head)) },
+        // done / not done (takes over the browser's bookmark shortcut while you're in the list)
+        { key: 'Mod-d', preventDefault: true, run: (v) => { toggleDone(v, selectedLines(v.state)); return true } },
         { key: 'Escape', run: () => onBack() },
         ...defaultKeymap, ...historyKeymap, indentWithTab,
       ]),
